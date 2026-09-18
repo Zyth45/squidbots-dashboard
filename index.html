@@ -25,7 +25,9 @@
   --accent: #0f8a74;
   --good: #0f7a2e;
   --bad: #c0392b;
+  --rare: #1e6fc4;
   --epic: #7a4bd0;
+  --legendary: #b8620a;
   --shadow: 0 1px 2px rgba(22, 21, 15, .06), 0 12px 32px rgba(22, 21, 15, .06);
 }
 @media (prefers-color-scheme: dark) {
@@ -49,7 +51,9 @@
     --accent: #1aa390;
     --good: #35b36a;
     --bad: #e05a4a;
+    --rare: #4a9eff;
     --epic: #a97ce8;
+    --legendary: #ff9a3c;
     --shadow: 0 1px 2px rgba(0, 0, 0, .5), 0 18px 40px rgba(0, 0, 0, .45);
   }
 }
@@ -73,7 +77,9 @@
   --accent: #1aa390;
   --good: #35b36a;
   --bad: #e05a4a;
+  --rare: #4a9eff;
   --epic: #a97ce8;
+  --legendary: #ff9a3c;
   --shadow: 0 1px 2px rgba(0, 0, 0, .5), 0 18px 40px rgba(0, 0, 0, .45);
 }
 
@@ -173,7 +179,9 @@ td.r, th.r { text-align: right; font-variant-numeric: tabular-nums; }
 .offline { opacity: .55; }
 .empty { color: var(--text-muted); font-size: 13px; padding: 14px 2px; margin: 0; }
 .scroll { overflow-x: auto; }
-.epic { color: var(--epic); font-weight: 560; }
+.q3 { color: var(--rare); font-weight: 560; }
+.q4 { color: var(--epic); font-weight: 560; }
+.q5 { color: var(--legendary); font-weight: 560; }
 
 /* ---------- watch ---------- */
 .watch { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--hairline);
@@ -286,10 +294,8 @@ footer a { color: var(--gold); }
 
 <div class="grid two">
   <section class="card">
-    <h2><span data-i18n="watchTitle"></span> <span class="sub" data-i18n="watchSub"></span></h2>
-    <div class="watch" id="watch"></div>
-    <div id="stuckNames"></div>
-    <ul class="events" id="incidents"></ul>
+    <h2><span data-i18n="progressTitle"></span> <span class="sub" id="progressSub"></span></h2>
+    <div class="chart" id="levelsChart"></div>
   </section>
   <section class="card">
     <h2><span data-i18n="levelsTitle"></span> <span class="sub" data-i18n="levelsSub"></span></h2>
@@ -303,8 +309,8 @@ footer a { color: var(--gold); }
     <div id="xpRate"></div>
   </section>
   <section class="card">
-    <h2><span data-i18n="chatTitle"></span> <span class="sub" id="chatSub"></span></h2>
-    <div id="chat"></div>
+    <h2><span data-i18n="spellsTitle"></span> <span class="sub" id="actionsSub"></span></h2>
+    <div id="actions"></div>
   </section>
 </div>
 
@@ -315,8 +321,10 @@ footer a { color: var(--gold); }
 
 <div class="grid two">
   <section class="card">
-    <h2><span data-i18n="progressTitle"></span> <span class="sub" id="progressSub"></span></h2>
-    <div class="chart" id="levelsChart"></div>
+    <h2><span data-i18n="watchTitle"></span> <span class="sub" data-i18n="watchSub"></span></h2>
+    <div class="watch" id="watch"></div>
+    <div id="stuckNames"></div>
+    <ul class="events" id="incidents"></ul>
   </section>
   <section class="card">
     <h2><span data-i18n="topTitle"></span> <span class="sub" data-i18n="topSub"></span></h2>
@@ -331,8 +339,8 @@ footer a { color: var(--gold); }
 
 <div class="grid wide">
   <section class="card">
-    <h2><span data-i18n="spellsTitle"></span> <span class="sub" id="actionsSub"></span></h2>
-    <div id="actions"></div>
+    <h2><span data-i18n="chatTitle"></span> <span class="sub" id="chatSub"></span></h2>
+    <div id="chat"></div>
   </section>
   <section class="card">
     <h2><span data-i18n="lootTitle"></span> <span class="sub" id="lootSub"></span></h2>
@@ -381,7 +389,7 @@ const WORDS = {
     xpWait: "First reading under way: the ranking starts after an hour of play.",
     xpUnit: "xp/h", levelShort: n => "level " + n,
     chatTitle: "Most talkative", chatNone: "The chat journal starts at the next server restart.",
-    chatSub: (m, t) => m + " messages · " + t + " talkative bots",
+    chatSub: (m, t) => m + " messages · " + t + " talkers",
     chatChannel: n => n + " in a channel", chatOther: "conversations and emotes", chatUnit: "msg",
     classesTitle: "Class ranking", classesSub: "average level, and each class's podium",
     colClass: "Class", colAvgLevel: "Average level", colBots: "Bots", colKills: "Mobs", colPodium: "Podium",
@@ -393,9 +401,9 @@ const WORDS = {
     spellsTitle: "Spells cast", spellsSub: h => "over " + h + " h · cast / tried",
     spellsNone: "No spell journal.",
     colAction: "Action", colSuccess: "Success", colCast: "Cast", colTried: "Tried",
-    lootTitle: "Rare finds", lootSub: n => n + " in the last two days",
+    lootTitle: "Notable finds", lootSub: n => n + " in the last two days",
     lootNone: "No loot journal yet: it starts at the next server restart.",
-    lootQuiet: "Nothing epic in the last two days.",
+    lootQuiet: "Nothing notable in the last two days.",
     sheetLevel: "Level", sheetKills: "Mobs killed", sheetQuests: "Quests", sheetPlayed: "Time played",
     sheetXp: "Experience", sheetZone: "Zone", close: "Close",
     tank: "tank", heal: "healer", dps: "damage",
@@ -440,7 +448,7 @@ const WORDS = {
     xpWait: "Première mesure en cours : le classement démarre après une heure de jeu.",
     xpUnit: "xp/h", levelShort: n => "niveau " + n,
     chatTitle: "Les plus bavards", chatNone: "Le journal du chat commence au prochain démarrage du serveur.",
-    chatSub: (m, t) => m + " messages · " + t + " bots bavards",
+    chatSub: (m, t) => m + " messages · " + t + " bavards",
     chatChannel: n => n + " dans un canal", chatOther: "conversations et émotes", chatUnit: "msg",
     classesTitle: "Classement par classe", classesSub: "niveau moyen, et le podium de chaque classe",
     colClass: "Classe", colAvgLevel: "Niveau moyen", colBots: "Bots", colKills: "Monstres", colPodium: "Podium",
@@ -454,7 +462,7 @@ const WORDS = {
     colAction: "Action", colSuccess: "Réussite", colCast: "Lancés", colTried: "Tentés",
     lootTitle: "Butin remarquable", lootSub: n => n + " sur les deux derniers jours",
     lootNone: "Pas encore de journal du butin : il commence au prochain démarrage du serveur.",
-    lootQuiet: "Rien d'épique sur les deux derniers jours.",
+    lootQuiet: "Rien de remarquable sur les deux derniers jours.",
     sheetLevel: "Niveau", sheetKills: "Monstres tués", sheetQuests: "Quêtes", sheetPlayed: "Temps de jeu",
     sheetXp: "Expérience", sheetZone: "Zone", close: "Fermer",
     tank: "tank", heal: "soigneur", dps: "dégâts",
@@ -906,7 +914,8 @@ function renderLoot(data) {
   for (const row of loot.rows) {
     const line = el("tr");
     line.append(el("td", { class: "meta num", style: "white-space:nowrap" }, clock(row.ts)));
-    line.append(el("td", {}, '<div class="epic">' + esc(row.item) + (row.count > 1 ? " ×" + row.count : "") +
+    line.append(el("td", {}, '<div class="q' + (row.quality > 5 ? 5 : row.quality) + '">' +
+      esc(row.item) + (row.count > 1 ? " ×" + row.count : "") +
       '</div><div class="meta">' + esc(names[row.cls] || "") + " · " + esc(W.levelShort(row.level)) + "</div>"));
     line.append(el("td", { class: "r" }, '<div class="name clickable">' + esc(row.bot) +
       '</div><div class="meta">ilvl ' + esc(row.ilvl) + "</div>"));
