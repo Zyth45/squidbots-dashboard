@@ -483,7 +483,7 @@ class Stats:
                          key=lambda c: c["avgLevel"], reverse=True)
 
         levels = {}
-        for b in bots:
+        for b in online:
             levels[b["level"]] = levels.get(b["level"], 0) + 1
         specs = {}
         for b in bots:
@@ -505,7 +505,7 @@ class Stats:
                 "kills": top(lambda b: b["kills"]),
                 "quests": top(lambda b: b["quests"]),
             },
-            "roles": {r: sum(1 for b in bots if b["role"] == r) for r in ("tank", "heal", "dps", "none")},
+            "roles": {r: sum(1 for b in online if b["role"] == r) for r in ("tank", "heal", "dps", "none")},
             "factions": {
                 "online": {f: sum(1 for b in online if b["faction"] == f) for f in ("alliance", "horde")},
                 "all": {f: sum(1 for b in bots if b["faction"] == f) for f in ("alliance", "horde")},
