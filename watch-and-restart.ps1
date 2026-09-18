@@ -47,9 +47,15 @@ function Trim-Log {
     param([string] $Path, [int] $Hours)
     if (-not (Test-Path $Path)) { return }
     $cutoff = (Get-Date).AddHours(-$Hours)
+    # The worldserver holds the file open for writing, and ReadAllLines asks for a share mode that
+    # forbids exactly that: it has to be opened sharing read *and* write, or Windows refuses.
     try {
-        $lines = [IO.File]::ReadAllLines($Path)
+        $stream = [IO.File]::Open($Path, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::ReadWrite)
+        $reader = New-Object IO.StreamReader($stream, [Text.Encoding]::UTF8)
+        $lines = $reader.ReadToEnd() -split "`r?`n"
+        $reader.Close()
     } catch { Log "   cannot read $(Split-Path $Path -Leaf): $($_.Exception.Message)"; return }
+    if ($lines.Length -gt 0 -and $lines[-1] -eq "") { $lines = $lines[0..($lines.Length - 2)] }
     if ($lines.Length -eq 0) { return }
 
     $keepFrom = -1
