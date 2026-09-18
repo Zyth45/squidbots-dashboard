@@ -1,0 +1,12 @@
+# Your own settings: paths, ports, and where the public copy goes.
+dashboard.json
+
+# The Discord webhook, which is a secret.
+alerte-discord.txt
+
+# Written while it runs.
+baseline.json
+history.json
+xp-history.json
+*.log
+*.tmp

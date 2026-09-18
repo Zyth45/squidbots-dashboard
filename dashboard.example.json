@@ -1,0 +1,23 @@
+{
+  "repack": "C:\\my-server",
+  "port": 8088,
+
+  "_comment_mysql": "Either drop this file next to a repack that holds Settings/database.json, or point mysqlArgs at your own client file. Never put a password in this file: keep it in the MySQL client file, outside the repository.",
+  "mysqlArgs": ["--defaults-file=C:\\my-server\\mysql\\root-client.ini"],
+  "mysqlExe": "C:\\Program Files\\MySQL\\MySQL Server 8.4\\bin\\mysql.exe",
+
+  "_comment_paths": "Only needed when several servers run on the same machine, or when the folders are not the repack's own.",
+  "worldserverPath": "C:\\my-server\\server\\worldserver.exe",
+  "coaLog": "C:\\my-server\\server\\logs\\CoaBots.log",
+  "chatLog": "C:\\my-server\\server\\logs\\Chat.log",
+  "lootLog": "C:\\my-server\\server\\logs\\BotLoot.log",
+  "crashesDir": "C:\\my-server\\server\\Crashes",
+  "dbcDir": "C:\\my-server\\server\\data\\dbc",
+  "incidentsLog": "C:\\my-server\\watch.txt",
+
+  "_comment_dates": "uptimeSince counts the server hours from that date; countFrom makes every figure start there instead of at the bots' creation.",
+  "uptimeSince": "2026-09-01 00:00:00",
+
+  "_comment_publish": "Optional: a folder a web server serves. The dashboard only writes index.html and stats.json there, so nothing on this machine is reachable from outside.",
+  "publishDir": "\\\\my-nas\\www\\bots"
+}
