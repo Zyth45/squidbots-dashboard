@@ -2,6 +2,8 @@
 
 A dashboard for a server running a thousand bots, and the watchman that goes with it.
 
+![The dashboard, dark theme](docs/squidbots.png)
+
 It reads an [AzerothCore](https://github.com/azerothcore/azerothcore-wotlk) database and the
 worldserver's own logs, and shows what the bots are actually doing: where they are, what they
 kill, which ones are stuck, what they find, and whether the server crashed while you slept.

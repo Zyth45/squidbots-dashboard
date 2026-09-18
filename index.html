@@ -542,7 +542,7 @@ function lineChart(host, points, options) {
   // Round the top of the scale: readers compare against 40 000, not against 43 972.
   const rough = Math.max(Math.max.apply(null, ys), 1) * 1.12 / 4;
   const power = Math.pow(10, Math.floor(Math.log10(rough)));
-  const step = power * [1, 2, 2.5, 5, 10].find(m => power * m >= rough);
+  const step = power * [1, 1.5, 2, 2.5, 3, 4, 5, 10].find(m => power * m >= rough);
   const yMax = step * 4;
   const px = t => left + (width - left - right) * (x1 === x0 ? 0.5 : (t - x0) / (x1 - x0));
   const py = v => height - bottom - (height - top - bottom) * (v / yMax);
@@ -687,7 +687,8 @@ function renderRoles(data) {
 function rankedList(host, rows, options) {
   host.innerHTML = "";
   if (!rows || !rows.length) { host.append(el("p", { class: "empty" }, options.waiting || W.measuring)); return; }
-  const max = Math.max.apply(null, rows.map(options.value).concat([1]));
+  const bar = options.bar || options.value;
+  const max = Math.max.apply(null, rows.map(bar).concat([1]));
   const body = el("tbody");
   rows.forEach((row, i) => {
     const line = el("tr", row.online === false ? { class: "offline" } : {});
@@ -695,7 +696,7 @@ function rankedList(host, rows, options) {
     line.append(el("td", {}, '<div class="name clickable">' + (row.faction ? factionDot(row.faction) : "") +
       esc(row.name) + '</div><div class="meta">' + esc(options.line2(row)) + "</div>"));
     line.append(el("td", { style: "width:32%" },
-      '<div class="bar"><i style="width:' + (options.value(row) / max * 100) + '%"></i></div>'));
+      '<div class="bar"><i style="width:' + (bar(row) / max * 100) + '%"></i></div>'));
     line.append(el("td", { class: "r" },
       '<b class="num">' + num(options.value(row)) + '</b> <span class="meta">' + esc(options.unit) + "</span>"));
     body.append(line);
@@ -802,9 +803,10 @@ function renderLevels(data) {
   host.innerHTML = "";
   const rows = data.levels || [];
   if (!rows.length) { host.innerHTML = '<p class="empty">' + esc(W.noData) + "</p>"; return; }
-  const buckets = [];
-  for (let start = 1; start <= 60; start += 10) {
-    buckets.push({ label: start === 1 ? "1-9" : start + "-" + (start + 9), count: 0 });
+  // One band per ten levels, the way the count below sorts them: 1-9, then 10-19 and so on.
+  const buckets = [{ label: "1-9", count: 0 }];
+  for (let start = 10; start <= 50; start += 10) {
+    buckets.push({ label: start + "-" + (start === 50 ? 60 : start + 9), count: 0 });
   }
   for (const row of rows) {
     buckets[Math.min(buckets.length - 1, Math.floor(row.level / 10))].count += row.count;
@@ -862,6 +864,8 @@ function renderTop(data) {
   const rows = (data.top || {})[topKey] || [];
   rankedList(document.getElementById("top"), rows, {
     value: topKey === "xp" ? (b => b.level) : (b => b[topKey]),
+    // Ten bots at the level cap would all draw a full bar: inside a level, the experience separates them.
+    bar: topKey === "xp" ? (b => b.xp) : null,
     unit: topKey === "xp" ? W.unitLevel : topKey === "kills" ? W.unitKills : W.unitQuests,
     line2: b => b.cls + (b.spec ? " · " + b.spec : "") + (b.online ? "" : " · " + W.offline),
   });
