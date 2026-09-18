@@ -253,7 +253,6 @@ def mysql(query):
         exe = SETTINGS.get("mysqlExe", "C:/Program Files/MySQL/MySQL Server 8.4/bin/mysql.exe")
         login = list(SETTINGS["mysqlArgs"])
     else:
-        # Fallback for a repack that ships its own credentials; otherwise set mysqlArgs in dashboard.json.
         password = json.load(open(os.path.join(ROOT, "Settings", "database.json"), encoding="utf-8"))["rootPassword"]
         exe = next(glob.iglob(os.path.join(ROOT, "**", "mysql.exe"), recursive=True))
         login = ["--host=127.0.0.1", "--port=3307", "-uroot", "-p" + password]
@@ -527,6 +526,9 @@ class Stats:
                        "alliance": sum(1 for b in online if b["zone"] == zone and b["faction"] == "alliance")}
                       for zone, n in sorted(zone_counts.items(), key=lambda kv: kv[1], reverse=True)[:10]],
             "compare": compare,
+            # "footer" in dashboard.json replaces the page's own line, and "" removes it: a server
+            # that shares its page before it is ready may not want to point at its sources yet.
+            "footer": SETTINGS.get("footer"),
             "classNames": {str(k): v for k, v in self.classes.items()},
             "bots": [{"n": b["name"], "c": b["cls"], "s": b["spec"], "r": b["role"], "l": b["level"],
                       "k": b["kills"], "q": b["quests"], "g": round(b["gold"], 1), "o": b["online"],

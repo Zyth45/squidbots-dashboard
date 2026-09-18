@@ -115,6 +115,9 @@ incidents are announced there; with no file, nothing is ever sent anywhere.
 
 ## Notes
 
+- `footer` in the settings replaces the line at the foot of the page, and `""` removes it along
+  with its links: handy while showing the page around before the sources are ready.
+
 - Figures follow `PlayerSaveInterval`: a kill shows up when the character is saved, not the
   second it happens. Rates are measured over a sliding half hour for that reason.
 - `baseline.json`, `history.json` and `xp-history.json` are written next to the script. Delete

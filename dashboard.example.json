@@ -18,6 +18,9 @@
   "_comment_dates": "uptimeSince counts the server hours from that date; countFrom makes every figure start there instead of at the bots' creation.",
   "uptimeSince": "2026-09-01 00:00:00",
 
+  "_comment_footer": "Replaces the line at the foot of the page. An empty string removes it entirely, links included, which is what you want while sharing the page before the sources are ready.",
+  "footer": "",
+
   "_comment_publish": "Optional: a folder a web server serves. The dashboard only writes index.html and stats.json there, so nothing on this machine is reachable from outside.",
   "publishDir": "\\\\my-nas\\www\\bots"
 }

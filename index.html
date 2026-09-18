@@ -515,8 +515,15 @@ function applyWords() {
     node.setAttribute("aria-label", W[node.dataset.i18nAria]);
   }
   document.getElementById("langButton").textContent = W.otherLang;
-  document.getElementById("footer").innerHTML = esc(W.footer) +
-    '<a href="https://github.com/Zyth45/mod-playerbots/tree/coa">' + esc(W.footerLink) + "</a>";
+  renderFooter();
+}
+
+// The page's own line, unless dashboard.json gives one of its own; "" there means no footer.
+let FOOTER = null;
+function renderFooter() {
+  document.getElementById("footer").innerHTML = typeof FOOTER === "string"
+    ? esc(FOOTER)
+    : esc(W.footer) + '<a href="https://github.com/Zyth45/mod-playerbots/tree/coa">' + esc(W.footerLink) + "</a>";
 }
 
 /* ---------------- theme and language ---------------- */
@@ -1008,6 +1015,10 @@ document.addEventListener("click", event => {
 let LAST = null;
 function render(data) {
   LAST = data;
+  if (typeof data.footer === "string" || data.footer === null) {
+    FOOTER = typeof data.footer === "string" ? data.footer : null;
+    renderFooter();
+  }
   const running = (data.server || {}).running;
   document.getElementById("stateDot").className = "dot live" + (running ? "" : " off");
   document.getElementById("stateText").textContent =
