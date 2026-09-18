@@ -48,6 +48,7 @@ HISTORY_EVERY = 10 * 60        # one point every 10 minutes
 HISTORY_KEEP = 7 * 24 * 3600   # a week of points
 # Experience of every bot, once an hour, to work out who gains the most over a day.
 XP_FILE = os.path.join(HERE, "xp-history.json")
+LEVELS_FILE = os.path.join(HERE, "levels.json")
 XP_EVERY = 3600
 XP_KEEP = 25 * 3600
 # Optional public copy: a folder a web server serves, on a NAS or anywhere else. The dashboard only
@@ -310,6 +311,7 @@ class Stats:
         self.cached_at = 0.0
         self.data = None
         self.baseline = None
+        self.level_ups = json.load(open(LEVELS_FILE, encoding="utf-8")) if os.path.exists(LEVELS_FILE) else {}
         self.specs = {}
         self.classes = {}
         self.xp_levels = {}
@@ -410,6 +412,21 @@ class Stats:
             started, recorded = int(starts[-1][0]), int(starts[-1][1])
             uptime_seconds += max(0, int(time.time()) - started - recorded)
         uptime = {"hours": round(uptime_seconds / 3600.0, 1)}
+
+        # Levels gained since the worldserver started, added up one level-up at a time: the sum of the
+        # bots' levels also moves when level brackets send bots down, or far up, which is not play.
+        server_start = int(starts[-1][0]) if starts else 0
+        if self.level_ups.get("start") != server_start:
+            self.level_ups = {"start": server_start, "gained": 0, "last": {}}
+        last = self.level_ups["last"]
+        for b in bots:
+            before = last.get(b["name"])
+            if before is not None and 0 < b["level"] - before <= 3:
+                self.level_ups["gained"] += b["level"] - before
+            last[b["name"]] = b["level"]
+        json.dump(self.level_ups, open(LEVELS_FILE, "w", encoding="utf-8"))
+        session["levels"] = self.level_ups["gained"]
+        session["levelHours"] = round((time.time() - server_start) / 3600.0, 3) if server_start else 0
 
         # Points for the curves, kept on disk so they survive a restart of the dashboard.
         now = time.time()
