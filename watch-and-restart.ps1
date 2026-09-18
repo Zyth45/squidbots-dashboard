@@ -13,7 +13,10 @@ param(
     [string] $Journal = (Join-Path $PSScriptRoot "watch.txt"),
     [string] $WebhookFile = (Join-Path $PSScriptRoot "alerte-discord.txt"),
     [string] $StackScript = "",          # optional, called as <script> <pid> <exe> <base> <samples>
-    [string] $Python = "python"
+    [string] $Python = "python",
+    [string[]] $TrimLogs = @("Chat.log"),   # logs kept to the last $TrimHours; empty to never trim
+    [int] $TrimHours = 24,
+    [int] $TrimEveryMinutes = 60
 )
 $ErrorActionPreference = 'Continue'
 
@@ -36,6 +39,42 @@ function Alert {
     } catch { Log "   Discord alert failed: $($_.Exception.Message)" }
 }
 
+# A chat log of a thousand bots grows about a megabyte an hour, and nothing ever shortens it.
+# The worldserver holds the file open, so renaming or replacing it would leave the server writing
+# into a file no one can see any more: the only safe move is to rewrite it in place, keeping the
+# tail. It is opened shared, so at worst one line written during the rewrite is lost.
+function Trim-Log {
+    param([string] $Path, [int] $Hours)
+    if (-not (Test-Path $Path)) { return }
+    $cutoff = (Get-Date).AddHours(-$Hours)
+    try {
+        $lines = [IO.File]::ReadAllLines($Path)
+    } catch { Log "   cannot read $(Split-Path $Path -Leaf): $($_.Exception.Message)"; return }
+    if ($lines.Length -eq 0) { return }
+
+    $keepFrom = -1
+    for ($i = 0; $i -lt $lines.Length; $i++) {
+        $line = $lines[$i]
+        if ($line.Length -lt 19) { continue }
+        $when = [datetime]::MinValue
+        if ([datetime]::TryParseExact($line.Substring(0, 19), 'yyyy-MM-dd HH:mm:ss',
+                [Globalization.CultureInfo]::InvariantCulture, [Globalization.DateTimeStyles]::None, [ref] $when)) {
+            if ($when -ge $cutoff) { $keepFrom = $i; break }
+        }
+    }
+    if ($keepFrom -le 0) { return }          # nothing older than the window, or no date at all
+
+    $kept = [string]::Join("`r`n", $lines[$keepFrom..($lines.Length - 1)]) + "`r`n"
+    $bytes = [Text.Encoding]::UTF8.GetBytes($kept)
+    try {
+        $stream = [IO.File]::Open($Path, [IO.FileMode]::Open, [IO.FileAccess]::Write, [IO.FileShare]::ReadWrite)
+        $stream.Write($bytes, 0, $bytes.Length)
+        $stream.SetLength($bytes.Length)
+        $stream.Close()
+        Log "$(Split-Path $Path -Leaf) trimmed: $($lines.Length - $keepFrom) lines kept of $($lines.Length), the last $Hours h"
+    } catch { Log "   cannot trim $(Split-Path $Path -Leaf): $($_.Exception.Message)" }
+}
+
 function Get-World {
     Get-Process worldserver -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "$Server\*" }
 }
@@ -47,9 +86,15 @@ function Start-World {
 }
 
 Log "watching $Server (a freeze is $FreezeMinutes minutes without a log line)"
+$lastTrim = Get-Date
 while ($true) {
     Start-Sleep 60
     $world = Get-World
+
+    if ($TrimLogs -and ((Get-Date) - $lastTrim).TotalMinutes -ge $TrimEveryMinutes) {
+        $lastTrim = Get-Date
+        foreach ($name in $TrimLogs) { Trim-Log (Join-Path "$Server\logs" $name) $TrimHours }
+    }
 
     if (-not $world) {
         $crashes = Get-ChildItem "$Server\Crashes" -Filter *.txt -ErrorAction SilentlyContinue |

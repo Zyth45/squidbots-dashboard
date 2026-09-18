@@ -98,11 +98,17 @@ a log untouched for five minutes is the tell. Before killing a frozen server it 
 thread stacks, which is usually what tells you why it froze.
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File watch-and-restart.ps1
+powershell -ExecutionPolicy Bypass -File watch-and-restart.ps1 -Server C:\my-server\server
 ```
 
 It writes one line per event, and the dashboard shows that journal in the watch post card
 (`incidentsLog` in the settings).
+
+**It also keeps the chat log short.** A thousand bots write about a megabyte an hour and nothing
+ever shortens it, so once an hour the watchman rewrites `Chat.log` in place, keeping the last 24
+hours (`-TrimLogs`, `-TrimHours`, `-TrimEveryMinutes`). It rewrites rather than renames on purpose:
+the worldserver holds the file open, and a rename would leave it writing into a file no one can
+see any more.
 
 **Discord alerts are opt-in.** Put a webhook URL in `alerte-discord.txt` next to the script and
 incidents are announced there; with no file, nothing is ever sent anywhere.
