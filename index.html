@@ -806,7 +806,7 @@ function renderWatch(data) {
   const events = document.getElementById("incidents");
   events.innerHTML = "";
   const rows = watch.incidents;
-  if (!rows) { events.innerHTML = '<li><span class="meta">' + esc(W.watchNoJournal) + "</span></li>"; return; }
+  if (!rows) return;   // no watch journal on this server: nothing to list, and nothing to apologise for
   if (!rows.length) { events.innerHTML = '<li><span class="meta">' + esc(W.watchQuiet) + "</span></li>"; return; }
   for (const row of rows) {
     events.append(el("li", {}, "<time>" + esc(row.at) + "</time><span>" + esc(row.what) + "</span>"));
