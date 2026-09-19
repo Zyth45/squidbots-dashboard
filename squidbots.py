@@ -256,7 +256,9 @@ def mysql(query):
     else:
         password = json.load(open(os.path.join(ROOT, "Settings", "database.json"), encoding="utf-8"))["rootPassword"]
         exe = next(glob.iglob(os.path.join(ROOT, "**", "mysql.exe"), recursive=True))
-        login = ["--host=127.0.0.1", "--port=3307", "-uroot", "-p" + password]
+        repack = os.path.join(ROOT, "Settings", "repack.json")
+        port = json.load(open(repack, encoding="utf-8-sig")).get("mysqlPort", 3307) if os.path.exists(repack) else 3307
+        login = ["--host=127.0.0.1", "--port=%d" % port, "-uroot", "-p" + password]
     out = subprocess.run([exe] + login + ["-N", "-B", "-e", query],
                          capture_output=True, text=True, encoding="utf-8", timeout=30)
     if out.returncode:
