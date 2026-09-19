@@ -27,7 +27,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 # quests since then, bot actions and crashes since then (a test run on a server that already has old bots).
 # Without it the dashboard expects to sit in <repack>\Dashboard and publishes nothing.
 SETTINGS_FILE = os.path.join(HERE, "dashboard.json")
-SETTINGS = json.load(open(SETTINGS_FILE, encoding="utf-8")) if os.path.exists(SETTINGS_FILE) else {}
+SETTINGS = json.load(open(SETTINGS_FILE, encoding="utf-8-sig")) if os.path.exists(SETTINGS_FILE) else {}
 def find_repack():
     # <repack>\Dashboard or <repack>\CoA-Bots\Dashboard: the first parent holding the repack settings.
     folder = os.path.dirname(HERE)
