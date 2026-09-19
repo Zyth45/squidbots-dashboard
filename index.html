@@ -630,7 +630,7 @@ function lineChart(host, points, options) {
    followed by a flat line; a wider window gives the rate the bots actually hold. */
 function rates(history, key, window) {
   const span = window || 0.5;
-  const points = history || [], out = [];
+  const points = (history || []).filter(p => p[key] !== undefined), out = [];
   let start = 0;
   for (let i = 1; i < points.length; i++) {
     while (start < i - 1 && (points[i].ts - points[start + 1].ts) / 3600 >= span) start++;
@@ -1043,7 +1043,7 @@ function render(data) {
   lineChart(document.getElementById("paceChart"), pace,
     { value: p => p.rate, label: W.paceTitle, unit: W.paceSub });
   document.getElementById("paceSub").textContent = pace.length ? W.paceSub : "";
-  const levels = rates(data.history, "levels");
+  const levels = rates(data.history, "levelUps");
   lineChart(document.getElementById("levelsChart"), levels,
     { value: p => p.rate, label: W.progressTitle, unit: W.progressSub, color: "var(--accent)" });
   document.getElementById("progressSub").textContent = levels.length ? W.progressSub : "";

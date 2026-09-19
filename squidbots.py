@@ -419,12 +419,15 @@ class Stats:
         # bots' levels also moves when level brackets send bots down, or far up, which is not play.
         server_start = int(starts[-1][0]) if starts else 0
         if self.level_ups.get("start") != server_start:
-            self.level_ups = {"start": server_start, "gained": 0, "last": {}}
+            # "total" goes on across restarts: it feeds the curves and the 24-hour comparison.
+            self.level_ups = {"start": server_start, "gained": 0, "last": {}, "total": self.level_ups.get("total", 0)}
+        self.level_ups.setdefault("total", self.level_ups["gained"])   # a levels.json from before the total
         last = self.level_ups["last"]
         for b in bots:
             before = last.get(b["name"])
             if before is not None and 0 < b["level"] - before <= 3:
                 self.level_ups["gained"] += b["level"] - before
+                self.level_ups["total"] = self.level_ups.get("total", 0) + b["level"] - before
             last[b["name"]] = b["level"]
         json.dump(self.level_ups, open(LEVELS_FILE, "w", encoding="utf-8"))
         session["levels"] = self.level_ups["gained"]
@@ -434,7 +437,8 @@ class Stats:
         now = time.time()
         if not self.history or now - self.history[-1]["ts"] >= HISTORY_EVERY:
             self.history.append({"ts": round(now), "kills": totals["kills"], "quests": totals["quests"],
-                                 "levels": sum(b["level"] for b in bots), "avg": totals["avgLevelOnline"],
+                                 "levels": sum(b["level"] for b in bots), "levelUps": self.level_ups.get("total", 0),
+                                 "avg": totals["avgLevelOnline"],
                                  "online": totals["online"],
                                  "dead": sum(1 for b in online if b["dead"])})
             self.history = [p for p in self.history if now - p["ts"] <= HISTORY_KEEP]
@@ -470,12 +474,14 @@ class Stats:
 
         # The last 24 hours against the 24 before them, from the same curve the page draws.
         def between(start, end, key):
-            inside = [p for p in self.history if start <= p["ts"] <= end]
+            inside = [p for p in self.history if start <= p["ts"] <= end and key in p]
             return (inside[-1][key] - inside[0][key]) if len(inside) > 1 else None
 
         compare = {}
-        for key in ("kills", "quests", "levels"):
-            today, before = between(now - 24 * 3600, now, key), between(now - 48 * 3600, now - 24 * 3600, key)
+        # Levels from the level-up count: the sum of levels drops whenever brackets send bots back to level 1.
+        for key, source in (("kills", "kills"), ("quests", "quests"), ("levels", "levelUps")):
+            today = between(now - 24 * 3600, now, source)
+            before = between(now - 48 * 3600, now - 24 * 3600, source)
             compare[key] = {"today": today, "before": before}
 
         def top(key, extra=None):
