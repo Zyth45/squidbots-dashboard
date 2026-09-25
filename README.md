@@ -1,41 +1,58 @@
 # SquidBots
 
-A dashboard for a server running a thousand bots, and the watchman that goes with it.
+**A live dashboard for an AzerothCore realm full of bots** — where they are, what they are doing,
+what they kill, say and find, and whether the server held up while you slept.
 
-![The dashboard](docs/squidbots.png)
+![The World page: a thousand bots on the map, and the one you follow](docs/world.png)
 
-It reads an [AzerothCore](https://github.com/azerothcore/azerothcore-wotlk) database and the
-worldserver's logs, and shows what the bots are doing: where they are, what they kill, which ones
-are stuck, what they say and find, and whether the server crashed while you slept. Built for
-[Conquest of Azeroth](https://github.com/jealous-sound/azerothcore-wotlk-coa) with
-[mod-playerbots](https://github.com/Zyth45/mod-playerbots/tree/coa); a plain AzerothCore realm
-works too.
+Built for [Conquest of Azeroth](https://github.com/jealous-sound/azerothcore-wotlk-coa) with
+[mod-playerbots](https://github.com/Zyth45/mod-playerbots/tree/coa) (branch `coa`); a plain
+AzerothCore realm works too. It reads the game database and the worldserver's logs, never writes to
+the database, and runs on the Python that ships with the repack: no framework, no build step, no
+package to install, no request to any outside site.
 
-English and French. Dark theme only. No framework, no build step, no packages, no outside request
-(the Cinzel font is bundled under the SIL Open Font License, `static/fonts/OFL.txt`).
+It comes in two versions from the same code: a **private** one on `localhost` with everything,
+including the bot settings, and a **public** copy of plain files you can put on any web server.
 
-## Pages
+## What you get
 
-| Page | What is on it |
+**World** — the headline figures, each continent's map with every bot on it (click a zone for its
+own map, a bot for its card), and the bot you follow, live: the page at the top of this file.
+
+| **Bots** | **Stats** |
 |---|---|
-| World | six headline figures, a map of each continent with the bots on it (click a zone for its own map, a bot for its card), and the bot you follow |
-| Bots | every bot online, sortable and filterable, beside the followed bot's card |
-| Stats | hunting pace, factions, roles, busiest zones, today against yesterday, dead bots, level spread, stuck bots and crashes, experience per hour, leaderboard, spells cast, class ranking |
-| Chat & Loot | the live chat feed (searchable, refreshed every 5 s; private version only), the most talkative bots, and the epics they find |
-| Settings | private version only: the bot settings that matter, explained, with a warning when another setting cancels one out, and one-click recipes |
+| ![Bots](docs/bots.png) | ![Stats](docs/stats.png) |
+| Every bot online, sortable and filterable: class, specialization, zone, what it is doing right now, health. | Hunting pace, factions and roles, busiest zones, today against yesterday, bots on the floor, level spread, stuck bots and crashes, experience per hour, leaderboard, spells cast, class ranking. |
+| **Chat & Loot** | **Settings** (private version only) |
+| ![Chat and loot](docs/chat.png) | ![Settings](docs/settings.png) |
+| The live chat feed (private version; searchable, every 5 s), the most talkative bots, and the epics and rares they find. | The bot settings that matter, in plain words, with a warning when another setting cancels one out, and one-click recipes such as *CoA Bots v1.4: the recommended settings*. |
 
-Any bot name opens its sheet, as does the search box.
+<img src="docs/card.png" align="right" width="230" alt="A bot's card">
+
+**Every bot has a card.** Click it on the map, in the list or through the search box: class and
+specialization, what it is doing (*Fighting Blackhand Thug*, *Questing: Border Crossings*,
+*Dead, running back*...), its health and power, its group, its quests and what it said lately.
+
+The live part — task, health, power, position to the second — comes from `bot-status.json`, which
+mod-playerbots writes when `AiPlayerbot.CoaStatusFile` is set (see [Live status](#live-status)).
+Without it the card falls back to the last character save: alive or dead, online or not.
+
+English and French. Dark theme. The Cinzel font is bundled under the SIL Open Font License
+(`static/fonts/OFL.txt`).
+
+<br clear="right">
 
 ## Install
 
 Needs Python 3.9 or later and the `mysql` client binary.
 
 1. Copy `squidbots.py`, `botconfig.py`, `index.html`, `worldmap.json`, `static/` and
-   `dashboard.example.json` into a folder.
+   `dashboard.example.json` into a folder (`tools/` too if you want the real maps).
 2. Rename the example to `dashboard.json` and fill in your paths. **Keep your database password
    out of it**: point `mysqlArgs` at a MySQL client file, or drop the folder inside a repack that
-   has `Settings/database.json`.
-3. Run `python squidbots.py` and open http://localhost:8088.
+   has `Settings/database.json`. A second realm on the same MySQL names its own databases with
+   `"databases": {"auth": ..., "characters": ..., "world": ...}`.
+3. Run `python squidbots.py` and open http://localhost:8088 (or the `port` you set).
 
 ## Two versions: private and public
 
@@ -113,6 +130,8 @@ The maps are Blizzard's and are git-ignored. With `publishDir` set, they are cop
 page (about 70 MB, only new or changed files), so the public map looks like the local one; without
 `publishDir` they never leave your machine. No other game art (interface, frames, icons) is used.
 
+## Live status
+
 Bots are placed from their last character save. For live positions, and for what each bot is doing
 on its card (health, power, task, group, quests), let mod-playerbots write a `bot-status.json` every
 few seconds and point `botStatusFile` in `dashboard.json` at it:
@@ -148,10 +167,23 @@ a webhook URL in `alerte-discord.txt` next to the script.
   `baseline.json` to restart the "gained since" figures.
 - `footer` in the settings replaces the page's footer line; `""` removes it.
 
+## Contributors
+
+A big thank you to **[Sass42](https://github.com/Sass42)**, whose
+[pull request #1](https://github.com/Zyth45/squidbots-dashboard/pull/1) turned a single page of
+figures into the dashboard you see above: the side navigation and its five pages, the continent and
+zone maps with the bots on them, the bot cards, the sortable roster, the live chat feed, the
+Settings page with its explanations, override warnings and recipes, and the tool that extracts the
+maps from your own client with nothing to install. The live bot status on the cards grew out of
+their work too. Thank you!
+
+Pull requests are welcome.
+
 ## Credits
 
 - [jealous-sound](https://github.com/jealous-sound/azerothcore-wotlk-coa) for Conquest of Azeroth
 - [mod-playerbots](https://github.com/mod-playerbots/mod-playerbots) for the bots
-- [Sass42](https://github.com/Sass42) for the pages, the map, the chat feed and the Settings page
+- [Sass42](https://github.com/Sass42) for the pages, the maps, the bot cards, the chat feed and the
+  Settings page
 - Written with [Claude Code](https://claude.com/claude-code); reviewed, tested and run on a real
   server with a thousand bots.
