@@ -27,14 +27,14 @@ import sys
 DEFAULT_OUT = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "worldmap.json")
 
-# The whole-continent entries, which give each canvas its extent.
+# The whole-continent entries, which give each canvas its extent. Northrend is left out: no Conquest
+# of Azeroth bot goes there.
 CONTINENTS = {
     0: "Eastern Kingdoms",
     1: "Kalimdor",
     530: "Outland",
-    571: "Northrend",
 }
-CONTINENT_AREA = {0: "Azeroth", 1: "Kalimdor", 530: "Expansion01", 571: "Northrend"}
+CONTINENT_AREA = {0: "Azeroth", 1: "Kalimdor", 530: "Expansion01"}
 
 
 def load(client_root):

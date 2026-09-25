@@ -959,17 +959,30 @@ def publish_static():
 MAP_FILE = re.compile(r"^(?:[0-9]+|zones/[A-Za-z0-9]+)\.png$")
 
 
+def map_files():
+    """The maps the page can show: one per continent of worldmap.json and one per zone in it."""
+    try:
+        world = json.load(open(os.path.join(HERE, "worldmap.json"), encoding="utf-8"))
+    except (OSError, ValueError):
+        return set()
+    names = {"%s.png" % key for key in world.get("continents", {})}
+    names |= {"zones/%s.png" % z["name"] for c in world.get("continents", {}).values() for z in c.get("zones", [])}
+    names |= {"zones/%s.png" % z["name"] for z in world.get("offworld", [])}
+    return names
+
+
 def publish_maps():
-    """Copy maps/ (the continent and zone maps extracted from the client) beside the public page.
+    """Copy the maps the page shows (extracted from the client into maps/) beside the public page.
     About 70 MB: a file is copied only when it is new or its size or date changed, never re-read."""
     source = os.path.join(HERE, "maps")
     if not os.path.isdir(source):
         return
+    wanted = map_files()
     for folder, _dirs, names in os.walk(source):
         for name in names:
             path = os.path.join(folder, name)
             relative = os.path.relpath(path, source).replace(os.sep, "/")
-            if not MAP_FILE.match(relative):
+            if not MAP_FILE.match(relative) or relative not in wanted:
                 continue
             target = os.path.join(PUBLISH_DIR, "maps", *relative.split("/"))
             here = os.stat(path)

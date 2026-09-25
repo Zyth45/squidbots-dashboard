@@ -30,12 +30,12 @@ DEFAULT_OUT = os.path.join(
 
 SEP = wowart.SEP
 
-# The dashboard's map ids, and the client folder each one's art lives in.
+# The dashboard's map ids, and the client folder each one's art lives in (the same continents as
+# gen_worldmap.py: no Northrend).
 CONTINENTS = {
     "0": ("Azeroth", "Azeroth", "Eastern Kingdoms"),
     "1": ("Kalimdor", "Kalimdor", "Kalimdor"),
     "530": ("Expansion01", "Expansion01", "Outland"),
-    "571": ("Northrend", "Northrend", "Northrend"),
 }
 
 COLUMNS, ROWS = 4, 3
