@@ -1014,19 +1014,19 @@ function renderMap(data) {
   const zoom = ZOOM_ZONE ? zones.find(z => z.name === ZOOM_ZONE) || null : null;
   if (ZOOM_ZONE && !zoom) ZOOM_ZONE = null;
 
-  // The continent and zone maps extracted from the player's own client (tools/gen_mapart.py),
-  // on this machine only: the public copy carries no game art and draws the zone rectangles alone.
+  // The continent and zone maps extracted from the player's own client (tools/gen_art.py), served
+  // by the local server and copied beside the public page (publish_maps in squidbots.py).
   const W = 1002, H = 668;
   let view, image = null, dots, hits = "";
 
   if (zoom) {
     view = { x: 0, y: 0, w: 1, h: 1 };
-    /* private:start */image = "maps/zones/" + encodeURIComponent(zoom.name) + ".png?v=" + MAP_ART_VERSION + ART_STAMP;/* private:end */
+    image = "maps/zones/" + encodeURIComponent(zoom.name) + ".png?v=" + MAP_ART_VERSION + ART_STAMP;
     dots = here.map(p => ({ b: p.b, live: p.at.live, spot: worldToPct(zoom.bounds, p.at.x, p.at.y) }))
       .filter(p => inBox(p.spot, 0.01));
   } else {
     view = contentBounds(continent);
-    /* private:start */image = "maps/" + encodeURIComponent(MAP_ID) + ".png?v=" + MAP_ART_VERSION + ART_STAMP;/* private:end */
+    image = "maps/" + encodeURIComponent(MAP_ID) + ".png?v=" + MAP_ART_VERSION + ART_STAMP;
     dots = here.map(p => ({ b: p.b, live: p.at.live, spot: worldToPct(continent.bounds, p.at.x, p.at.y) }))
       .filter(p => inBox(p.spot, 0.02));
     hits = continent.zones.map(z => {
@@ -1385,7 +1385,7 @@ function renderArt() {
       ? "This map has no background yet. The dashboard can take the continent and zone maps from your own "
         + "game client. It takes about two minutes and needs nothing installed."
       : "Takes the continent and zone maps from your own game client. About two minutes, nothing to install. "
-        + "The maps stay on this machine (about 70 MB) and are never published. Run it again after a client patch.";
+        + "About 70 MB, copied to the public page too when one is set up. Run it again after a client patch.";
     const field = host.querySelector("[data-art-client]");
     if (!field.value && (job.client || state.suggestedClient)) field.value = job.client || state.suggestedClient;
     field.disabled = !!job.running;

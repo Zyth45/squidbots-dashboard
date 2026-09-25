@@ -893,12 +893,41 @@ def publish_static():
         write_atomic(target, body)
 
 
+MAP_FILE = re.compile(r"^(?:[0-9]+|zones/[A-Za-z0-9]+)\.png$")
+
+
+def publish_maps():
+    """Copy maps/ (the continent and zone maps extracted from the client) beside the public page.
+    About 70 MB: a file is copied only when it is new or its size or date changed, never re-read."""
+    source = os.path.join(HERE, "maps")
+    if not os.path.isdir(source):
+        return
+    for folder, _dirs, names in os.walk(source):
+        for name in names:
+            path = os.path.join(folder, name)
+            relative = os.path.relpath(path, source).replace(os.sep, "/")
+            if not MAP_FILE.match(relative):
+                continue
+            target = os.path.join(PUBLISH_DIR, "maps", *relative.split("/"))
+            here = os.stat(path)
+            try:
+                there = os.stat(target)
+                if there.st_size == here.st_size and int(there.st_mtime) == int(here.st_mtime):
+                    continue
+            except OSError:
+                pass
+            os.makedirs(os.path.dirname(target), exist_ok=True)
+            write_atomic(target, open(path, "rb").read())
+            os.utime(target, (here.st_atime, here.st_mtime))
+
+
 def publish_loop():
     while True:
         try:
             data = STATS.get()
             os.makedirs(PUBLISH_DIR, exist_ok=True)
             publish_static()
+            publish_maps()
             write_atomic(os.path.join(PUBLISH_DIR, "stats.json"),
                          json.dumps(public_copy(data), ensure_ascii=False).encode("utf-8"))
         except Exception as error:  # the NAS may be asleep or unreachable: retry next minute

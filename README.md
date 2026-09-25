@@ -107,8 +107,9 @@ with nothing to install. The same from a terminal:
 python tools/gen_art.py --client C:\my-client --dbc C:\my-server\server\data\dbc
 ```
 
-The maps are Blizzard's: they stay on your machine, are git-ignored, and are never published. The
-public copy draws the zone rectangles only. No other game art (interface, frames, icons) is used.
+The maps are Blizzard's and are git-ignored. With `publishDir` set, they are copied beside the public
+page (about 70 MB, only new or changed files), so the public map looks like the local one; without
+`publishDir` they never leave your machine. No other game art (interface, frames, icons) is used.
 
 Bots are placed from their last character save. For live positions, and for what each bot is doing
 on its card (health, power, task, group, quests), let mod-playerbots write a `bot-status.json` every
