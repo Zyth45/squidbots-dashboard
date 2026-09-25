@@ -1078,6 +1078,7 @@ function renderMap(data) {
   if (away.length) bits.push(away.length + " bot(s) in instances or on maps with no world outline");
   if (LIVE.missing) bits.push("Positions are from the last save, not live: " + LIVE.missing);
   else if (LIVE.age !== null) bits.push("Live positions, " + LIVE.age + " s old");
+  else bits.push("Positions are from the last character save");
   elsewhere.textContent = bits.join(". ");
 }
 
@@ -1092,14 +1093,16 @@ function botCardHtml(bot, withChat) {
     + '" style="width:' + Math.max(0, Math.min(100, pct)) + '%"></i></span><b>' + pct + "%</b></div>";
   const power = live ? ({ 0: "Mana", 1: "Rage", 2: "Focus", 3: "Energy", 6: "Runic" }[live.pt] || "Power") : "";
   let task;
+  // Without a live snapshot (no module writes one on a stock repack), say what the last save knows.
   if (live) task = live.task || "Idle";
-  else task = LIVE.missing ? "No live status (server not writing bot-status.json)" : "No live status yet";
+  else if (LIVE.missing) task = "No live status: " + LIVE.missing;
+  else task = bot.d ? "Dead" : bot.o ? "Online" : "Offline";
   const rows = [];
   rows.push('<div class="bc-head">' + (bot.f ? factionDot(bot.f) : "") + "<b>" + esc(bot.n) + "</b>"
     + '<span class="bc-lvl">' + esc(String(live ? live.l : bot.l)) + "</span></div>");
   rows.push('<div class="bc-who">' + esc(bot.c) + (bot.s ? " · " + esc(bot.s) : "")
     + (bot.r ? " · " + esc(W[bot.r] || bot.r) : "") + "</div>");
-  rows.push('<div class="bc-task' + (live && live.combat ? " combat" : "") + (live && live.dead ? " dead" : "")
+  rows.push('<div class="bc-task' + (live && live.combat ? " combat" : "") + ((live ? live.dead : bot.d) ? " dead" : "")
     + '">' + esc(task) + "</div>");
   if (live) {
     rows.push(bar("Health", live.hp, "hp"));

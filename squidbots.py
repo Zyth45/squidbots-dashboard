@@ -402,9 +402,11 @@ STATUS_STALE = 60   # seconds; older than this the server has stopped writing it
 
 
 def live_status():
-    """{"at", "age", "bots"} from the module's snapshot, or {"bots": [], "missing": reason}."""
+    """{"at", "age", "bots"} from the module's snapshot; {"bots": [], "absent": True} on a realm with no
+    such module (the usual case: nothing in the repack writes it); {"bots": [], "missing": reason} when
+    the file is there but stale or unreadable."""
     if not os.path.exists(STATUS_FILE):
-        return {"bots": [], "missing": "no status file (set BotMinds.Status.File)"}
+        return {"bots": [], "absent": True}
     try:
         with open(STATUS_FILE, encoding="utf-8", errors="replace") as handle:
             data = json.load(handle)
@@ -773,7 +775,7 @@ class Stats:
             "bots": [{"n": b["name"], "c": b["cls"], "s": b["spec"], "r": b["role"], "l": b["level"],
                       "k": b["kills"], "q": b["quests"], "g": round(b["gold"], 1), "o": b["online"],
                       "f": b["faction"], "z": self.zones.get(b["zone"], ""), "h": round(b["hours"], 1),
-                      "m": b["map"], "x": round(b["x"], 1), "y": round(b["y"], 1)}
+                      "m": b["map"], "x": round(b["x"], 1), "y": round(b["y"], 1), "d": b["dead"]}
                      for b in bots],
             "loot": loot_feed(),
             "classes": classes,
