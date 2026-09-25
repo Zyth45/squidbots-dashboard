@@ -45,15 +45,17 @@ chat feed with every channel, memory, crashes and the watch journal. The server 
 name onto it), and accepts a write only as JSON from its own page (so another site cannot post a
 form to it).
 
-**Public** is what `publishDir` receives once a minute for a web server to serve: plain files
-(`index.html`, `static/`, `worldmap.json`, `stats.json`) and no process anyone can reach. It is
-built, not filtered:
+**Public** is what `publishDir` receives for a web server to serve: plain files (`index.html`,
+`static/`, `worldmap.json`, `maps/`, `stats.json` once a minute, `live.json` every 12 s) and no
+process anyone can reach. It is built, not filtered:
 
 - `stats.json` carries only the keys listed in `PUBLIC_KEYS` in `squidbots.py`. A figure added
   later stays private until it is listed there.
 - Never public: what real players say (no line of chat at all; "most talkative" counts bots only),
   memory, crashes, the watch journal, paths, configuration, errors.
-- Never public either: the extracted maps.
+- `live.json` carries only the bot fields the map and cards show (`PUBLIC_LIVE_FIELDS`), and no
+  real player's name: a group led by a player loses its leader's name, a fight with a player reads
+  "Fighting a player".
 - The page's private code sits between `private:start` and `private:end` markers and is removed
   from the public files, not hidden. Publishing stops if anything private is left in them.
 
