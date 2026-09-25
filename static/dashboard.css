@@ -296,8 +296,8 @@ td.r, th.r { text-align: right; font-variant-numeric: tabular-nums; }
 .bot-card .bc-chat time { color: var(--text-muted); font-variant-numeric: tabular-nums; }
 .bot-card .bc-chat b { color: var(--text-primary); font-weight: 600; }
 .bot-card .bc-chat p { margin: 2px 0 0; }
-/* In the focus panel the same card sits in the flow, not over the map. */
-#focusCard .bot-card { position: static; width: auto; max-width: none; pointer-events: auto; }
+/* In the focus panels (World and Bots pages) the same card sits in the flow, not over the map. */
+[data-focus-card] .bot-card { position: static; width: auto; max-width: none; pointer-events: auto; }
 
 /* ---------- settings ---------- */
 .settings-group { margin-top: 18px; }
