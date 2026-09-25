@@ -92,7 +92,7 @@ SETTINGS = [Setting(*row) for row in (
     # The live view of this dashboard: mod-playerbots (branch coa) writes a snapshot of every bot.
     ("AiPlayerbot.CoaStatusFile", PLAYERBOTS, "Dashboard live view", "Live status file", "quoted", None, "reload",
      "Where the server writes each bot's health, power and current action for this dashboard's map and cards. "
-     "Put it next to CoaBots.log (logs\bot-status.json) and the dashboard finds it by itself. Empty: not written."),
+     "Put it next to CoaBots.log (logs\\bot-status.json) and the dashboard finds it by itself. Empty: not written."),
     ("AiPlayerbot.CoaStatusIntervalSeconds", PLAYERBOTS, "Dashboard live view", "Refresh every (seconds)", "int", None, "reload",
      "How often the live status file is rewritten. Under a millisecond of server time per snapshot with 1000 bots."),
 
