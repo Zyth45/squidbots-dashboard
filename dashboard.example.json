@@ -30,6 +30,6 @@
   "_comment_footer": "Replaces the line at the foot of the page. An empty string removes it entirely, links included, which is what you want while sharing the page before the sources are ready.",
   "footer": "",
 
-  "_comment_publish": "Optional: a folder a web server serves. The dashboard only writes index.html and stats.json there, so nothing on this machine is reachable from outside.",
+  "_comment_publish": "Optional: a folder a web server serves. The dashboard writes only the public page there (index.html, static/, worldmap.json, maps/, stats.json every minute, live.json every 12 s), so nothing on this machine is reachable from outside.",
   "publishDir": "\\\\my-nas\\www\\bots"
 }
