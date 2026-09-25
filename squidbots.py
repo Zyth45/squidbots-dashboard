@@ -902,6 +902,9 @@ def public_copy(data):
     public["watch"] = {key: watch.get(key) for key in ("deadNow", "stuck", "stuckNames")}
     # Only what bots said, counted: no line of text, and no real player's name.
     public["chat"] = (data.get("chat") or {}).get("bots")
+    # The bots online only: the map and the roster show nothing else, and the offline ones were two
+    # thirds of the file. A name of an offline bot in a ranking is then shown, not linked.
+    public["bots"] = [bot for bot in data.get("bots") or [] if bot.get("o")]
     return public
 
 
@@ -1005,7 +1008,7 @@ def publish_loop():
             publish_static()
             publish_maps()
             write_atomic(os.path.join(PUBLISH_DIR, "stats.json"),
-                         json.dumps(public_copy(data), ensure_ascii=False).encode("utf-8"))
+                         json.dumps(public_copy(data), ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
         except Exception as error:  # the NAS may be asleep or unreachable: retry next minute
             print("Public copy failed:", error, flush=True)
         time.sleep(PUBLISH_EVERY)
