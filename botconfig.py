@@ -40,6 +40,8 @@ SETTINGS = [Setting(*row) for row in (
      "The server keeps at least this many random bots in the world."),
     ("AiPlayerbot.MaxRandomBots", PLAYERBOTS, "Population", "Most random bots online", "int", None, "restart",
      "The server never runs more random bots than this. More bots means more server load."),
+    ("AiPlayerbot.BotActiveAlone", PLAYERBOTS, "Population", "Bots awake with no player near (%)", "int", None, "restart",
+     "Share of bots that keep playing when no real player is around. 100 keeps them all active, at the cost of server load. 60 is what a 1000-bot realm was measured to need."),
 
     ("AiPlayerbot.RandomBotMinLevel", PLAYERBOTS, "Levels", "Lowest level a bot is given", "int", None, "new bots",
      "The bottom of the range new bots are rolled into."),
@@ -68,6 +70,37 @@ SETTINGS = [Setting(*row) for row in (
      "Bots spend their talent points themselves when they level up."),
     ("AiPlayerbot.LimitTalentsExpansion", PLAYERBOTS, "Behaviour", "Hold talents to their expansion", "bool", None, "restart",
      "Bots below 61 only use the talent rows Classic had, and below 71 the rows The Burning Crusade had."),
+
+    # CoA Bots (mod-playerbots, branch coa). Harmless on another realm: absent keys are not shown.
+    ("AiPlayerbot.CoaSpecRotations", PLAYERBOTS, "CoA Bots", "Written rotations for CoA specializations", "bool", None, "restart",
+     "Bots play each Conquest of Azeroth specialization with its own written rotation. Off: they fall back to generic behaviour and none of the CoA rotation work reaches them."),
+    ("AiPlayerbot.CoaClassesOnly", PLAYERBOTS, "CoA Bots", "Random bots use CoA classes only", "bool", None, "new bots",
+     "New random bots are created in the Conquest of Azeroth classes only."),
+    ("AiPlayerbot.CoaSmartHeal", PLAYERBOTS, "CoA Bots", "Smarter healers", "bool", None, "restart",
+     "CoA healers keep their mana for healing and pick who to heal by need."),
+    ("AiPlayerbot.CoaSmartTank", PLAYERBOTS, "CoA Bots", "Damage dealers let the tank open", "bool", None, "restart",
+     "In a group with a tank, CoA damage dealers wait for the tank to take the target first."),
+    ("AiPlayerbot.CoaTankOpenerSeconds", PLAYERBOTS, "CoA Bots", "Longest wait for the tank (seconds)", "int", None, "reload",
+     "With the setting above: how long a damage dealer waits on a target no tank has touched, then goes all out. 0: no wait."),
+    ("AiPlayerbot.CoaExcludedSpecializations", PLAYERBOTS, "CoA Bots", "Specializations bots never use", "ids", None, "restart",
+     "Specialization numbers separated by commas. 99 (Bloodmage Eternal) is left out by default: it cannot taunt until the core grants its form."),
+    ("AiPlayerbot.CoaGroupTelemetry", PLAYERBOTS, "CoA Bots", "Group fight report in CoaBots.log", "bool", None, "restart",
+     "Writes a report at the end of every fight of a group with a real player in it (health, deaths, healing, mana). For measuring; off on a normal realm."),
+    ("AiPlayerbot.CoaLfgBots", PLAYERBOTS, "CoA Bots", "Bots answer \"lfg bot\" in chat", "bool", None, "reload",
+     "A player who says \"lfg bot heal\", \"lfg bot tank\" or \"lfg bot\" in a listened channel is whispered by free bots able to play those roles."),
+
+    # Channels and bot chat. Conquest of Azeroth numbers and names its channels differently from a
+    # stock client: with the stock values bot broadcasts are dropped or land in the wrong channel.
+    ("AiPlayerbot.ZoneChannelId", PLAYERBOTS, "Channels and chat", "Zone channel number", "int", None, "restart",
+     "The number of the Zone channel. Conquest of Azeroth uses 3, not the stock 1."),
+    ("AiPlayerbot.BroadcastWorldChannelName", PLAYERBOTS, "Channels and chat", "Realm-wide channel name", "quoted", None, "restart",
+     "Conquest of Azeroth calls it Ascension. Until this matches, every broadcast meant for it is dropped."),
+    ("AiPlayerbot.BroadcastToWorldGlobalChance", PLAYERBOTS, "Channels and chat", "Bot chatter in the realm-wide channel", "int", None, "restart",
+     "0 to 30000; 0 keeps bots out of the realm-wide channel, which everybody reads. Their chatter belongs in Zone."),
+    ("AiPlayerbot.BotsWhisperPublic", PLAYERBOTS, "Channels and chat", "Bots whisper unasked", "bool", None, "restart",
+     "On: bots whisper a player who writes in a channel, and tell their master every potion and buff. Off: a word in a channel no longer brings a wall of whispers."),
+    ("AiPlayerbot.PublicReplyChance", PLAYERBOTS, "Channels and chat", "Bots answering a channel message (%)", "int", None, "restart",
+     "How many of the bots that read a player's channel message may answer. High values bury the player; a bot called by name always answers."),
 
     ("Dynamic.XP.Preset", DYNAMICXP, "Experience", "Realm XP rate", "choice", ["0", "1", "3", "5", "7"], "reload",
      "XP multiplier for every character that has not picked its own: 1 is normal, 3, 5 or 7 times as fast, or 0 for the per-level curve."),
@@ -158,6 +191,19 @@ RECIPES = [
                  "AiPlayerbot.LevelBrackets.Dynamic.UseDynamicDistribution": "1"},
      "after": "Level Brackets starts moving bots within 5 minutes of a restart."},
 ]
+RECIPES.insert(0, {
+    "id": "coa-v14",
+    "title": "CoA Bots v1.4: the recommended settings",
+    "summary": "What the v1.4 release ships: 200 bots, 60% awake, Conquest of Azeroth's channel number "
+               "and name, no whisper flood, the written rotations on and Bloodmage Eternal left out.",
+    "changes": {"AiPlayerbot.MinRandomBots": "200", "AiPlayerbot.MaxRandomBots": "200",
+                "AiPlayerbot.BotActiveAlone": "60",
+                "AiPlayerbot.ZoneChannelId": "3", "AiPlayerbot.BroadcastWorldChannelName": "Ascension",
+                "AiPlayerbot.BroadcastToWorldGlobalChance": "0",
+                "AiPlayerbot.BotsWhisperPublic": "0", "AiPlayerbot.PublicReplyChance": "5",
+                "AiPlayerbot.CoaSpecRotations": "1", "AiPlayerbot.CoaExcludedSpecializations": "99",
+                "AiPlayerbot.CoaGroupTelemetry": "0", "AiPlayerbot.CoaLfgBots": "1"},
+    "after": "Takes effect at the next server start."})
 _RECIPES = {recipe["id"]: recipe for recipe in RECIPES}
 
 
@@ -210,6 +256,8 @@ def read_settings(conf_dir):
             match = _line_re(key).search(text)
             if match:
                 value, present = match.group(2).strip(), True
+                if kind == "quoted" and len(value) >= 2 and value[0] == value[-1] == '"':
+                    value = value[1:-1]
         out.append({"key": key, "file": filename, "group": group, "label": label,
                     "kind": kind, "choices": choices, "when": when, "help": help_text,
                     "value": value, "present": present})
@@ -234,6 +282,12 @@ def validate(key, value):
     elif kind == "float":
         if not re.match(r"^-?\d+(\.\d+)?$", text):
             return "expected a number"
+    elif kind == "ids":
+        if not re.match(r"^\d+(\s*,\s*\d+)*$", text):
+            return "expected numbers separated by commas"
+    elif kind == "quoted":
+        if '"' in text or len(text) > 100:
+            return "a name without quotes, at most 100 characters"
     elif kind == "text":
         if len(text) > 200:
             return "value is too long"
@@ -262,7 +316,10 @@ def apply_settings(conf_dir, changes, backup_dir):
 
     by_file = {}
     for key, value in changes.items():
-        by_file.setdefault(BY_KEY[key][1], {})[key] = str(value).strip()
+        text = str(value).strip()
+        if BY_KEY[key].kind == "quoted":
+            text = '"%s"' % text
+        by_file.setdefault(BY_KEY[key].file, {})[key] = text
 
     stamp = datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S")
     written, backups = {}, []

@@ -83,6 +83,13 @@ CONFIG_DIR = SETTINGS.get("configDir") or find_config_dir()
 CONFIG_BACKUPS = os.path.join(HERE, "config-backups")
 STATIC_TYPES = {".css": "text/css; charset=utf-8", ".js": "application/javascript; charset=utf-8",
                 ".woff2": "font/woff2"}
+# The game databases. A second realm on the same MySQL (a test realm, say) names its own in
+# dashboard.json: {"databases": {"auth": "dev_auth", "characters": "dev_characters", "world": "dev_world"}}.
+DB = dict({"auth": "acore_auth", "characters": "acore_characters", "world": "acore_world"},
+          **(SETTINGS.get("databases") or {}))
+for _name in DB.values():
+    if not re.match(r"^[A-Za-z0-9_]+$", _name):
+        raise SystemExit("dashboard.json: %r is not a database name" % _name)
 CACHE_SECONDS = 20
 HISTORY_FILE = os.path.join(HERE, "history.json")
 HISTORY_EVERY = 10 * 60        # one point every 10 minutes
@@ -521,14 +528,14 @@ class Stats:
             for key, build in json.load(open(BUILDS, encoding="utf-8")).items():
                 self.specs[key] = build["spec"]
         if not self.classes:
-            for cls, name in mysql("SELECT class, client_name FROM acore_world.ascension_custom_class"):
+            for cls, name in mysql("SELECT class, client_name FROM %s.ascension_custom_class" % DB["world"]):
                 self.classes[int(cls)] = name
         if self.zones is None:
             self.zones = zone_names()
         if not self.xp_levels:
             # Experience needed to reach each level, so that levels and experience compare as one number.
             total = 0
-            for level, needed in mysql("SELECT Level, Experience FROM acore_world.player_xp_for_level ORDER BY Level"):
+            for level, needed in mysql("SELECT Level, Experience FROM %s.player_xp_for_level ORDER BY Level" % DB["world"]):
                 self.xp_levels[int(level)] = total
                 total += int(needed)
             self.xp_levels[max(self.xp_levels) + 1] = total
@@ -551,12 +558,12 @@ class Stats:
             "SELECT c.name, c.class, c.level, c.xp, c.online, TRIM(IFNULL(s.data, '0')), IFNULL(k.counter, 0), "
             "IFNULL(q.n, 0), c.totaltime, c.race, c.money, c.health, c.zone, "
             "c.map, c.position_x, c.position_y "
-            "FROM acore_characters.characters c JOIN acore_auth.account a ON a.id = c.account "
-            "LEFT JOIN acore_characters.character_settings s ON s.guid = c.guid AND s.source = 'core.ascension_active_spec' "
-            "LEFT JOIN acore_characters.character_achievement_progress k ON k.guid = c.guid AND k.criteria = 5529 "
-            "LEFT JOIN (SELECT guid, COUNT(*) n FROM acore_characters.character_queststatus_rewarded GROUP BY guid) q "
+            "FROM {characters}.characters c JOIN {auth}.account a ON a.id = c.account "
+            "LEFT JOIN {characters}.character_settings s ON s.guid = c.guid AND s.source = 'core.ascension_active_spec' "
+            "LEFT JOIN {characters}.character_achievement_progress k ON k.guid = c.guid AND k.criteria = 5529 "
+            "LEFT JOIN (SELECT guid, COUNT(*) n FROM {characters}.character_queststatus_rewarded GROUP BY guid) q "
             "ON q.guid = c.guid "
-            "WHERE a.username LIKE 'RNDBOT%'")
+            "WHERE a.username LIKE 'RNDBOT%'".format(**DB))
         bots = []
         for (name, cls, level, xp, online, spec, kills, quests, totaltime, race, money, health,
              zone, cmap, pos_x, pos_y) in rows:
@@ -607,8 +614,8 @@ class Stats:
 
         # Hours the worldserver ran since the 1000-bot setup, from AzerothCore's own uptime table. The
         # table is written every 10 minutes: the running start is counted up to now instead.
-        starts = mysql("SELECT starttime, uptime FROM acore_auth.uptime "
-                       "WHERE starttime >= UNIX_TIMESTAMP('%s') ORDER BY starttime" % UPTIME_SINCE)
+        starts = mysql("SELECT starttime, uptime FROM %s.uptime "
+                       "WHERE starttime >= UNIX_TIMESTAMP('%s') ORDER BY starttime" % (DB["auth"], UPTIME_SINCE))
         uptime_seconds = sum(int(up) for _, up in starts)
         if starts and server_state()["running"]:
             started, recorded = int(starts[-1][0]), int(starts[-1][1])

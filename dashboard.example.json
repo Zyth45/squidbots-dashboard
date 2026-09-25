@@ -6,6 +6,9 @@
   "mysqlArgs": ["--defaults-file=C:\\my-server\\mysql\\root-client.ini"],
   "mysqlExe": "C:\\Program Files\\MySQL\\MySQL Server 8.4\\bin\\mysql.exe",
 
+  "_comment_databases": "Only when your game databases are not acore_auth, acore_characters and acore_world, for a second realm on the same MySQL say.",
+  "databases": {"auth": "acore_auth", "characters": "acore_characters", "world": "acore_world"},
+
   "_comment_paths": "Only needed when several servers run on the same machine, or when the folders are not the repack's own.",
   "worldserverPath": "C:\\my-server\\server\\worldserver.exe",
   "coaLog": "C:\\my-server\\server\\logs\\CoaBots.log",

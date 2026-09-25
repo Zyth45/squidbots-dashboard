@@ -1553,27 +1553,33 @@ function renderSettings(config) {
 
   notes.innerHTML = (config.notes || []).map(n => esc(n)).join("<br>");
 
+  // Only settings found in their file get a row. A group with none (a module that is not
+  // installed) is left out entirely; keys missing from a file that exists fit on one line.
   const groups = [];
   for (const setting of config.settings) {
     let group = groups.find(g => g.name === setting.group);
-    if (!group) { group = { name: setting.group, rows: [] }; groups.push(group); }
-    group.rows.push(setting);
+    if (!group) { group = { name: setting.group, rows: [], missing: [] }; groups.push(group); }
+    (setting.present ? group.rows : group.missing).push(setting);
   }
 
-  holder.innerHTML = groups.map(group =>
+  holder.innerHTML = groups.filter(group => group.rows.length).map(group =>
     '<div class="settings-group"><h3>' + esc(group.name) + "</h3>"
     + group.rows.map(s =>
-      '<div class="settings-row' + (s.present ? "" : " missing") + '" data-row="' + esc(s.key) + '">'
+      '<div class="settings-row" data-row="' + esc(s.key) + '">'
       + '<div class="set-text">'
       + '<label for="set_' + esc(s.key.replace(/[^A-Za-z0-9]/g, "_")) + '">' + esc(s.label) + "</label>"
       + '<p class="set-help">' + esc(s.help) + "</p>"
       + '<p class="set-warn" hidden></p>'
-      + '<span class="key">' + esc(s.key) + (s.present ? "" : " (not found in " + esc(s.file) + ")") + "</span>"
+      + '<span class="key">' + esc(s.key) + "</span>"
       + "</div>"
       + '<div class="set-control">'
-      + (s.present ? settingControl(s) : "")
+      + settingControl(s)
       + '<span class="when">' + esc(WHEN[s.when] || "") + "</span>"
       + "</div></div>").join("")
+    + (group.missing.length
+      ? '<p class="set-missing">Not in ' + esc(group.missing[0].file) + ", so not shown: "
+        + group.missing.map(s => esc(s.key)).join(", ") + "</p>"
+      : "")
     + "</div>").join("");
 
   renderRecipes();
