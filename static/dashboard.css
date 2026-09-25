@@ -2,12 +2,10 @@
 @font-face { font-family: "Cinzel"; font-weight: 600; font-display: swap; src: url(fonts/cinzel-latin-600.woff2) format("woff2"); }
 @font-face { font-family: "Cinzel"; font-weight: 700; font-display: swap; src: url(fonts/cinzel-latin-700.woff2) format("woff2"); }
 
-/* SquidBots: a Warcraft-styled control room.
+/* SquidBots: a dark, gold-trimmed control room.
  *
- * Two looks share one set of rules. Without the client art (dashboard/ui/, extracted by
- * tools/gen_uiart.py) everything is drawn in CSS: dark stone panels with gold hairlines and
- * bevelled red buttons. When ui/manifest.json loads, the script sets html[data-art="client"]
- * and the panels, buttons and hover cards switch to the game's own textures.
+ * Everything is drawn in CSS: dark stone panels with gold hairlines and bevelled red buttons.
+ * No game art is used or loaded.
  */
 :root {
   color-scheme: dark;
@@ -57,12 +55,6 @@ body {
     repeating-linear-gradient(45deg, rgba(255, 255, 255, .012) 0 2px, transparent 2px 6px),
     var(--page);
   background-attachment: fixed;
-}
-html[data-art="client"] body {
-  background:
-    linear-gradient(180deg, rgba(8, 7, 5, .80), rgba(8, 7, 5, .93) 45%, rgba(8, 7, 5, .97)),
-    url(../ui/backdrop.png) center / cover fixed,
-    var(--page);
 }
 .num { font-variant-numeric: tabular-nums; }
 a { color: var(--gold); }
@@ -124,17 +116,8 @@ a { color: var(--gold); }
 .ico[data-icon="stats"]::before { content: "📜"; }
 .ico[data-icon="chat"]::before { content: "💬"; }
 .ico[data-icon="settings"]::before { content: "⚙"; }
-html[data-art="client"] .ico::before { content: none; }
-html[data-art="client"] .ico[data-icon="world"] { background-image: url(../ui/icon-world.png); }
-html[data-art="client"] .ico[data-icon="bots"] { background-image: url(../ui/icon-bots.png); }
-html[data-art="client"] .ico[data-icon="stats"] { background-image: url(../ui/icon-stats.png); }
-html[data-art="client"] .ico[data-icon="chat"] { background-image: url(../ui/icon-chat.png); }
-html[data-art="client"] .ico[data-icon="settings"] { background-image: url(../ui/icon-settings.png); }
 
 /* Class icons (class-<id>.png), drawn only with the client art. */
-.class-ico { display: none; width: 18px; height: 18px; border-radius: 50%; vertical-align: -4px; margin-right: 6px;
-  background: center / cover no-repeat; box-shadow: 0 0 0 1px #000, 0 0 0 2px var(--gold-deep); }
-html[data-art="client"] .class-ico { display: inline-block; }
 
 /* ---------- top bar ---------- */
 .topbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 26px 0 20px; }
@@ -171,31 +154,6 @@ html[data-art="client"] .class-ico { display: inline-block; }
 .btn:disabled, button.ghost:disabled, button.primary:disabled {
   cursor: default; filter: grayscale(.9) brightness(.7); color: #b8ad95; transform: none; }
 .btn.small { min-height: 24px; padding: 3px 11px; font-size: 11px; }
-html[data-art="client"] .btn,
-html[data-art="client"] button.ghost,
-html[data-art="client"] button.primary {
-  background: none; box-shadow: none; border-radius: 0;
-  border-style: solid; border-width: 5px 10px; border-color: transparent;
-  border-image: url(../ui/panel-button-up.png) 5 10 fill / 5px 10px stretch;
-  padding: 1px 8px;
-}
-html[data-art="client"] .btn:active,
-html[data-art="client"] button.ghost:active,
-html[data-art="client"] button.primary:active {
-  border-image-source: url(../ui/panel-button-down.png); filter: none; }
-html[data-art="client"] .btn:disabled,
-html[data-art="client"] button.ghost:disabled,
-html[data-art="client"] button.primary:disabled {
-  border-image-source: url(../ui/panel-button-disabled.png); filter: none; }
-html[data-art="client"] .btn:not(:disabled):hover::after,
-html[data-art="client"] button.ghost:not(:disabled):hover::after,
-html[data-art="client"] button.primary:not(:disabled):hover::after {
-  content: ""; position: absolute; inset: -5px -10px; pointer-events: none;
-  background: url(../ui/panel-button-highlight.png) center / 100% 100%; mix-blend-mode: screen;
-}
-html[data-art="client"] .btn:hover,
-html[data-art="client"] button.ghost:hover,
-html[data-art="client"] button.primary:hover { filter: none; }
 
 /* ---------- panels ---------- */
 .card {
@@ -208,13 +166,7 @@ html[data-art="client"] button.primary:hover { filter: none; }
   content: ""; position: absolute; left: 10px; right: 10px; top: 3px; height: 1px; pointer-events: none;
   background: linear-gradient(90deg, transparent, rgba(255, 212, 107, .25), transparent);
 }
-html[data-art="client"] .card {
-  border: 14px solid transparent; border-radius: 0; padding: 8px 10px;
-  border-image: url(../ui/frame-dialog.png) 32 / 14px stretch;
-  background: rgba(12, 10, 7, .93); background-clip: padding-box;
-  box-shadow: 0 14px 34px rgba(0, 0, 0, .55);
-}
-html[data-art="client"] .card::before { display: none; }
+
 .card > h2 {
   margin: 0 0 6px; display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
   font-family: var(--display); font-weight: 700; font-size: 16px; letter-spacing: .04em;
@@ -298,6 +250,8 @@ td.r, th.r { text-align: right; font-variant-numeric: tabular-nums; }
 .zone-row .bar i { display: block; height: 100%; }
 .map-svg image { image-rendering: auto; }
 .map-hit { fill: transparent; stroke: none; cursor: pointer; }
+/* No map image (the public copy, or maps not extracted yet): the zone rectangles draw the continent. */
+.map-svg.no-art .map-hit { fill: rgba(214, 176, 98, .05); stroke: var(--border); stroke-width: 1; }
 .map-hit:hover { fill: rgba(255, 212, 107, .20); stroke: var(--gold-bright); stroke-width: 2; }
 .map-hit.active { fill: rgba(255, 212, 107, .10); stroke: var(--gold-bright); stroke-width: 2; }
 .map-crumb { display: flex; align-items: center; gap: 10px; margin-top: 10px; font-size: 12px; color: var(--text-muted); }
@@ -317,10 +271,7 @@ td.r, th.r { text-align: right; font-variant-numeric: tabular-nums; }
   border: 1px solid #6a6a6a; border-radius: 5px; box-shadow: 0 8px 26px rgba(0, 0, 0, .7);
   padding: 9px 12px; font-size: 12.5px; pointer-events: none;
 }
-html[data-art="client"] .bot-card, html[data-art="client"] .results {
-  border: 8px solid transparent; border-radius: 0; padding: 3px 6px;
-  border-image: url(../ui/frame-tooltip.png) 16 / 8px stretch; background-clip: padding-box;
-}
+
 .bot-card.pinned { pointer-events: auto; border-color: var(--gold-bright); }
 .bot-card .bc-head { display: flex; align-items: center; gap: 6px; font-size: 14px; }
 .bot-card .bc-lvl { margin-left: auto; font-variant-numeric: tabular-nums; color: var(--text-muted); }
@@ -419,8 +370,7 @@ dialog {
   background: linear-gradient(180deg, #211a12, #140f0b); box-shadow: 0 20px 60px rgba(0, 0, 0, .8);
   max-width: 440px; width: calc(100% - 32px);
 }
-html[data-art="client"] dialog { border: 14px solid transparent; border-radius: 0;
-  border-image: url(../ui/frame-dialog.png) 32 / 14px stretch; background: rgba(12, 10, 7, .97); background-clip: padding-box; }
+
 dialog::backdrop { background: rgba(0, 0, 0, .65); backdrop-filter: blur(3px); }
 .sheet { padding: 20px 22px 18px; }
 .sheet h3 { margin: 0; font-family: var(--display); font-size: 21px; color: var(--gold-bright); }
@@ -473,13 +423,7 @@ dialog::backdrop { background: rgba(0, 0, 0, .65); backdrop-filter: blur(3px); }
 @media (min-width: 1180px) { .bots-layout { grid-template-columns: minmax(0, 1fr) 340px; } .bots-layout > .focus { position: sticky; top: 16px; } }
 
 /* ---------- game art ---------- */
-.art-prompt { margin: 12px 0; padding: 12px 14px; border: 1px solid var(--border); border-radius: 3px;
-  background: rgba(8, 6, 4, .55); }
-.art-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 10px 0 6px; }
-.art-row input { flex: 1 1 280px; min-width: 0; }
-.art-progress { display: flex; align-items: center; gap: 12px; margin: 8px 0; font-size: 12.5px; color: var(--text-secondary); }
-.art-progress .bar { flex: 0 0 220px; }
-.art-progress .bar i { display: block; height: 100%; background: linear-gradient(180deg, var(--gold-bright), var(--gold)); transition: width .4s; }
+
 .bad-text { color: #ff8f7a; }
 
 /* ---------- chart ---------- */
@@ -511,8 +455,36 @@ footer { color: var(--text-muted); font-size: 12px; text-align: center; padding:
   .search { flex: 1 1 auto; }
   .search input { width: 100%; }
   .results { width: 100%; }
-  html[data-art="client"] .card { border-width: 10px; border-image-width: 10px; padding: 6px 4px; }
+  
   .card { padding: 14px 12px; }
   .settings-row { flex-wrap: wrap; gap: 8px; }
   .set-control { flex-direction: row; align-items: center; gap: 10px; }
 }
+
+/* The build band: only a test realm shows it (see renderBuild). */
+.buildband {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+  box-shadow: var(--shadow); padding: 14px 18px; margin-bottom: 18px;
+}
+.buildhead { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.buildhead strong { font-size: 15px; font-weight: 650; color: var(--gold-bright); }
+.buildmeta { font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.prs { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.prs .pr {
+  display: inline-flex; align-items: baseline; gap: 6px; max-width: 100%;
+  border: 1px solid var(--border); border-radius: 999px; padding: 4px 12px;
+  font-size: 12px; text-decoration: none; color: var(--text-primary);
+}
+.prs .pr:hover { border-color: var(--gold); }
+.prs .pr span { color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.prs .pr em { font-style: normal; font-size: 11px; opacity: .75; }
+@media (max-width: 640px) { .prs .pr span { display: none; } }
+
+/* The Maps panel (private version only). */
+.art-prompt { margin: 12px 0; padding: 12px 14px; border: 1px solid var(--border); border-radius: 3px;
+  background: rgba(8, 6, 4, .55); }
+.art-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 10px 0 6px; }
+.art-row input { flex: 1 1 280px; min-width: 0; }
+.art-progress { display: flex; align-items: center; gap: 12px; margin: 8px 0; font-size: 12.5px; color: var(--text-secondary); }
+.art-progress .bar { flex: 0 0 220px; }
+.art-progress .bar i { display: block; height: 100%; background: linear-gradient(180deg, var(--gold-bright), var(--gold)); transition: width .4s; }

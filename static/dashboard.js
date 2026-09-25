@@ -200,23 +200,6 @@ function renderFooter() {
     : esc(W.footer) + '<a href="https://github.com/Zyth45/mod-playerbots/tree/coa">' + esc(W.footerLink) + "</a>";
 }
 
-/* ---------------- client art ---------------- */
-// The game's own UI art is extracted from the player's client (the Game art section of
-// Settings, or tools/gen_art.py). Without it the page keeps its CSS look; with it,
-// html[data-art="client"] switches frames and buttons over.
-let ART = new Set();
-function loadUiArt() {
-  fetch("ui/manifest.json", { cache: "no-store" }).then(r => (r.ok ? r.json() : null)).then(manifest => {
-    if (!manifest || !Array.isArray(manifest.files)) return;
-    ART = new Set(manifest.files);
-    document.documentElement.dataset.art = "client";
-    if (LAST) render(LAST);
-  }).catch(() => { /* no art: CSS look */ });
-}
-loadUiArt();
-const classIcon = id => ART.has("class-" + id)
-  ? '<i class="class-ico" style="background-image:url(ui/class-' + Number(id) + '.png)"></i>' : "";
-
 /* ---------------- pages ---------------- */
 // The public copy is read-only: no settings.
 const PAGES = ["world", "bots", "stats", "chat", "settings"]
@@ -234,7 +217,7 @@ function showPage() {
     else link.removeAttribute("aria-current");
   }
   document.getElementById("pageTitle").textContent = W.pageTitles[PAGE];
-  if (PAGE === "chat") loadFeed();
+  /* private:start */if (PAGE === "chat") loadFeed();/* private:end */
 }
 window.addEventListener("hashchange", showPage);
 
@@ -345,6 +328,26 @@ function rates(history, key, window) {
 }
 
 /* ---------------- sections ---------------- */
+/* What this particular server is running. Only a test realm ships a build.json; on every other
+   install `data.build` is absent and this band never appears. */
+function renderBuild(data) {
+  const band = document.getElementById("build");
+  const build = data.build;
+  if (!build) { band.hidden = true; return; }
+  const pulls = (build.pullRequests || []).map(pr =>
+    '<a class="pr" href="' + esc(pr.url || ("https://github.com/jealous-sound/azerothcore-wotlk-coa/pull/" + pr.number)) +
+    '" target="_blank" rel="noopener">#' + esc(String(pr.number)) +
+    (pr.merged ? "" : " <em>open</em>") + "<span>" + esc(pr.title || "") + "</span></a>").join("");
+  band.innerHTML =
+    '<div class="buildband">' +
+      '<div class="buildhead"><strong>' + esc(build.label || "Server") + "</strong>" +
+        '<span class="buildmeta">core ' + esc(build.core || "?") + " &middot; bots " + esc(build.bots || "?") + "</span>" +
+      "</div>" +
+      (pulls ? '<div class="prs">' + pulls + "</div>" : "") +
+    "</div>";
+  band.hidden = false;
+}
+
 function renderFigures(data) {
   const host = document.getElementById("figures");
   host.innerHTML = "";
@@ -611,6 +614,7 @@ function renderChat(data) {
   });
 }
 
+/* private:start */
 /* ---------------- live chat feed ---------------- */
 // Read from GET /api/chat every 5 s while the Chat page is open. The public copy has no
 // API behind it, so the feed is left out there.
@@ -714,6 +718,8 @@ async function loadBotChat(name) {
     if (node.dataset.botChat === name) node.outerHTML = botChatHtml(name);
   }
 }
+
+/* private:end */
 
 function renderLoot(data) {
   const host = document.getElementById("loot");
@@ -832,6 +838,7 @@ function render(data) {
     running ? W.online(num((data.totals || {}).online)) : W.stopped;
   document.getElementById("updatedPill").textContent = W.updated(data.generatedAt || "-");
 
+  renderBuild(data);
   renderFigures(data);
   renderFactions(data);
   renderRoles(data);
@@ -876,7 +883,7 @@ document.getElementById("topTabs").addEventListener("click", event => {
 let WORLD = null;
 let MAP_ID = "0";
 let ZOOM_ZONE = null;
-// Live snapshot from mod-bot-minds (bot-status.json via /api/live): current position,
+// Live snapshot from mod-bot-minds (bot-status.json, read by the local server): current position,
 // health and what each bot is doing. Keyed by name. Empty when the server is down or
 // no module writes bot-status.json, and the map falls back to the characters table.
 let LIVE = { byName: {}, age: null, missing: null };
@@ -889,9 +896,10 @@ const MAP_ART_VERSION = 3;
 let ART_STAMP = "";
 
 async function loadWorld() {
-  if (WORLD || PUBLIC) return WORLD;
+  if (WORLD) return WORLD;
   try {
-    const answer = await fetch("/worldmap.json", { cache: "no-cache" });
+    // Relative: the public copy carries its own worldmap.json next to stats.json.
+    const answer = await fetch("worldmap.json", { cache: "no-cache" });
     if (!answer.ok) return null;
     WORLD = await answer.json();
   } catch (error) { WORLD = null; }
@@ -900,6 +908,7 @@ async function loadWorld() {
 
 async function refreshLive() {
   if (PUBLIC) return;
+  /* private:start */
   try {
     const answer = await fetch("/api/live", { cache: "no-store" });
     const data = await answer.json();
@@ -909,6 +918,7 @@ async function refreshLive() {
   } catch (error) {
     LIVE = { byName: {}, age: null, missing: "live status unavailable" };
   }
+  /* private:end */
 }
 
 // World coordinates are rotated relative to the map: LocLeft and LocRight bound
@@ -1003,20 +1013,19 @@ function renderMap(data) {
   const zoom = ZOOM_ZONE ? zones.find(z => z.name === ZOOM_ZONE) || null : null;
   if (ZOOM_ZONE && !zoom) ZOOM_ZONE = null;
 
-  // The client's own art, with WoW's white padding cropped off by tools/gen_mapart.py.
-  // A zone view uses that zone's own map (tools/gen_mapart.py writes one per zone,
-  // every explored area painted in) rather than a blurry crop of the continent.
+  // The continent and zone maps extracted from the player's own client (tools/gen_mapart.py),
+  // on this machine only: the public copy carries no game art and draws the zone rectangles alone.
   const W = 1002, H = 668;
-  let view, image, dots, hits = "";
+  let view, image = null, dots, hits = "";
 
   if (zoom) {
     view = { x: 0, y: 0, w: 1, h: 1 };
-    image = "maps/zones/" + encodeURIComponent(zoom.name) + ".png?v=" + MAP_ART_VERSION + ART_STAMP;
+    /* private:start */image = "maps/zones/" + encodeURIComponent(zoom.name) + ".png?v=" + MAP_ART_VERSION + ART_STAMP;/* private:end */
     dots = here.map(p => ({ b: p.b, live: p.at.live, spot: worldToPct(zoom.bounds, p.at.x, p.at.y) }))
       .filter(p => inBox(p.spot, 0.01));
   } else {
     view = contentBounds(continent);
-    image = "maps/" + encodeURIComponent(MAP_ID) + ".png?v=" + MAP_ART_VERSION + ART_STAMP;
+    /* private:start */image = "maps/" + encodeURIComponent(MAP_ID) + ".png?v=" + MAP_ART_VERSION + ART_STAMP;/* private:end */
     dots = here.map(p => ({ b: p.b, live: p.at.live, spot: worldToPct(continent.bounds, p.at.x, p.at.y) }))
       .filter(p => inBox(p.spot, 0.02));
     hits = continent.zones.map(z => {
@@ -1041,12 +1050,12 @@ function renderMap(data) {
     + '" r="' + radius.toFixed(2) + '" stroke-width="' + (radius / 3).toFixed(2) + '"></circle>').join("");
 
   const vbW = view.w * W, vbH = view.h * H;
-  holder.innerHTML = '<svg class="map-svg" style="aspect-ratio:' + vbW.toFixed(2) + "/"
+  holder.innerHTML = '<svg class="map-svg' + (image ? "" : " no-art") + '" style="aspect-ratio:' + vbW.toFixed(2) + "/"
     + vbH.toFixed(2) + '" viewBox="' + (view.x * W) + " " + (view.y * H)
     + " " + vbW + " " + vbH + '" preserveAspectRatio="xMidYMid meet" '
     + 'role="img" aria-label="Bot positions on ' + esc(zoom ? zoneTitle(zoom) : continent.name) + '">'
-    + '<image href="' + image + '" x="0" y="0" width="' + W
-    + '" height="' + H + '" preserveAspectRatio="none"></image>'
+    + (image ? '<image href="' + image + '" x="0" y="0" width="' + W
+      + '" height="' + H + '" preserveAspectRatio="none"></image>' : "")
     + hits + dotMarks + "</svg>"
     + '<div class="bot-card" id="botCard" hidden></div>'
     + (zoom ? '<div class="map-crumb"><button class="ghost" type="button" id="mapBack">'
@@ -1104,7 +1113,7 @@ function botCardHtml(bot, withChat) {
         + live.quests.map(q => "<li>" + esc(q) + "</li>").join("") + "</ul></div>");
     }
   }
-  if (withChat && !PUBLIC) rows.push(botChatHtml(bot.n));
+  /* private:start */if (withChat && !PUBLIC) rows.push(botChatHtml(bot.n));/* private:end */
   const zoneName = zoneNameOf(bot);
   rows.push('<div class="bc-foot">' + esc(zoneName) + (zoneName ? " · " : "")
     + num(bot.k) + " kills · " + num(bot.q) + " quests · " + one(bot.g) + "g</div>");
@@ -1267,7 +1276,6 @@ function renderFocus() {
     }
     card.innerHTML = '<div class="bot-card">' + botCardHtml(bot, true) + "</div>";
     const head = card.querySelector(".bc-head");
-    if (head) head.insertAdjacentHTML("afterbegin", classIcon(classIdOf(bot.c)));
   }
 }
 
@@ -1300,7 +1308,7 @@ function renderRoster() {
   host.innerHTML = "<table><thead><tr><th>" + esc(W.sortName) + "</th><th>" + esc(W.colClass) + '</th><th class="r">'
     + esc(W.sortLevel) + "</th><th>" + esc(W.sortZone) + "</th><th>Doing</th><th>Health</th></tr></thead><tbody>"
     + shown.map(r => '<tr data-bot="' + esc(r.bot.n) + '"' + (r.bot.n === FOCUS ? ' class="focused"' : "") + ">"
-      + "<td>" + factionDot(r.bot.f) + classIcon(classIdOf(r.bot.c)) + "<b>" + esc(r.bot.n) + "</b></td>"
+      + "<td>" + factionDot(r.bot.f) + "<b>" + esc(r.bot.n) + "</b></td>"
       + '<td class="meta">' + esc(r.bot.c) + (r.bot.s ? " · " + esc(r.bot.s) : "") + "</td>"
       + '<td class="r">' + esc(r.level) + "</td>"
       + "<td>" + esc(r.zone) + "</td>"
@@ -1326,8 +1334,9 @@ document.getElementById("rosterSort").addEventListener("click", event => {
   renderRoster();
 });
 
-/* ----------------------------------------------------------- game art ---- */
-// The Game art section of Settings, and the same controls above the map while it has no
+/* private:start */
+/* --------------------------------------------------------------- maps ---- */
+// The Maps section of Settings, and the same controls above the map while it has no
 // art. POST /api/art starts tools/gen_art.py on the server; GET /api/art reports progress.
 let ART_STATE = null;
 let artTimer = null;
@@ -1344,7 +1353,7 @@ function artSkeleton(host) {
   host.innerHTML = '<p class="set-help" data-art-text></p>'
     + '<div class="art-row"><input data-art-client autocomplete="off" spellcheck="false" '
     + 'placeholder="C:\\Games\\World of Warcraft" aria-label="Game client folder">'
-    + '<button class="btn primary" type="button" data-art-go>Extract game art</button></div>'
+    + '<button class="btn primary" type="button" data-art-go>Extract maps</button></div>'
     + '<div class="art-progress" data-art-progress hidden><div class="bar"><i></i></div><span data-art-label></span></div>'
     + '<p class="meta" data-art-note></p>';
   let saved = "";
@@ -1356,27 +1365,26 @@ function renderArt() {
   if (PUBLIC || !ART_STATE) return;
   const state = ART_STATE;
   const job = state.job || {};
-  const have = state.maps > 0 || state.ui;
+  const have = state.maps > 0;
   const prompt = document.getElementById("artPrompt");
   prompt.hidden = state.maps > 0 && !job.running;
   document.getElementById("artSub").textContent = have
-    ? state.maps + " maps" + (state.ui ? ", frames and icons" : "") + " on this machine"
+    ? state.maps + " maps on this machine"
     : "not extracted yet";
   for (const host of artHosts()) {
     if (host.hidden) continue;
     artSkeleton(host);
     host.querySelector("[data-art-text]").textContent = host === prompt
-      ? "This map has no game art yet. The dashboard can take it from your own game client: the continent "
-        + "and zone maps, window frames and class icons. It takes about two minutes and needs nothing installed."
-      : "Takes the continent and zone maps, window frames and class icons from your own game client. "
-        + "About two minutes, nothing to install. The art stays on this machine (about 70 MB) and is never shared. "
-        + "Run it again after a client patch.";
+      ? "This map has no background yet. The dashboard can take the continent and zone maps from your own "
+        + "game client. It takes about two minutes and needs nothing installed."
+      : "Takes the continent and zone maps from your own game client. About two minutes, nothing to install. "
+        + "The maps stay on this machine (about 70 MB) and are never published. Run it again after a client patch.";
     const field = host.querySelector("[data-art-client]");
     if (!field.value && (job.client || state.suggestedClient)) field.value = job.client || state.suggestedClient;
     field.disabled = !!job.running;
     const button = host.querySelector("[data-art-go]");
     button.disabled = !!job.running;
-    button.textContent = job.running ? "Extracting…" : have ? "Extract again" : "Extract game art";
+    button.textContent = job.running ? "Extracting…" : have ? "Extract again" : "Extract maps";
     const progress = host.querySelector("[data-art-progress]");
     progress.hidden = !job.running;
     if (job.running) {
@@ -1400,7 +1408,6 @@ async function loadArt() {
   if (artWasRunning && !running) {
     // A run just ended: show the new art without a reload.
     ART_STAMP = "-" + Date.now();
-    loadUiArt();
     if (LAST) renderMap(LAST);
   }
   artWasRunning = running;
@@ -1667,14 +1674,16 @@ document.getElementById("recipes").addEventListener("click", event => {
   writeSettings(changes);
 });
 
+/* private:end */
+
 /* ------------------------------------------------------------- refresh ---- */
 
 function renderOffline(data) {
   const banner = document.getElementById("offlineBanner");
   banner.hidden = false;
-  banner.innerHTML = "<strong>The game server is not reachable.</strong> Live figures are "
-    + "unavailable, but bot settings below can still be changed: the configuration files are "
-    + "read when the server starts, so edits made now apply at the next start.";
+  banner.innerHTML = "<strong>The game server is not reachable.</strong> Live figures are unavailable"
+    + (PUBLIC ? "." : ", but bot settings can still be changed: the configuration files are "
+      + "read when the server starts, so edits made now apply at the next start.");
   document.getElementById("stateText").textContent = W.stopped;
   document.getElementById("stateDot").className = "dot off";
   document.getElementById("updatedPill").textContent = W.updated("-");
@@ -1698,10 +1707,10 @@ async function refresh() {
 }
 applyWords();
 showPage();
-loadConfig();
-loadArt();
+/* private:start */loadConfig();
+loadArt();/* private:end */
 refresh();
 setInterval(refresh, 20000);
 setInterval(refreshLiveMap, 5000);
 // The chat feed follows the log only while its page is open.
-setInterval(() => { if (PAGE === "chat" && !document.hidden) loadFeed(); }, 5000);
+/* private:start */setInterval(() => { if (PAGE === "chat" && !document.hidden) loadFeed(); }, 5000);/* private:end */

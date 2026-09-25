@@ -1,4 +1,6 @@
-"""Extract all of the game art the dashboard can use: UI textures into ui/, maps into maps/.
+"""Extract the continent and zone maps from the player's own client into maps/.
+
+Maps only: no interface art (frames, buttons, icons, backgrounds) is taken.
 
 This is what the page's "Extract game art" button runs. It prints one line per step,
 and lines starting with "STEP done/total " are progress the dashboard shows as is.
@@ -16,7 +18,6 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 sys.path.insert(0, HERE)
 import gen_mapart  # noqa: E402
-import gen_uiart  # noqa: E402
 import wowart  # noqa: E402
 
 
@@ -28,7 +29,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--client", required=True, help="the game client folder, the one holding Data/")
     parser.add_argument("--dbc", required=True, help="the server's dbc folder")
-    parser.add_argument("--root", default=ROOT, help="where ui/ and maps/ go (the dashboard folder)")
+    parser.add_argument("--root", default=ROOT, help="where maps/ goes (the dashboard folder)")
     args = parser.parse_args(argv)
 
     if not os.path.isdir(os.path.join(args.client, "Data")):
@@ -44,13 +45,10 @@ def main(argv=None):
         say("ERROR No readable MPQ archives in %s" % os.path.join(args.client, "Data"))
         return 1
 
-    say("STEP 0/0 Frames, buttons and class icons")
-    failed = gen_uiart.run(client, args.dbc, os.path.join(args.root, "ui"), say)
-
     def step(done, total, label):
         say("STEP %d/%d %s" % (done, total, label))
 
-    failed += gen_mapart.run(client, args.dbc, os.path.join(args.root, "maps"), say, step)
+    failed = gen_mapart.run(client, args.dbc, os.path.join(args.root, "maps"), say, step)
     say("DONE in %d s%s" % (time.time() - started,
                             ", %d missing: %s" % (len(failed), ", ".join(failed)) if failed else ""))
     return 0

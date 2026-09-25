@@ -21,8 +21,8 @@ English and French. Dark theme only. No framework, no build step, no packages, n
 | World | six headline figures, a map of each continent with the bots on it (click a zone for its own map, a bot for its card), and the bot you follow |
 | Bots | every bot online, sortable and filterable, beside the followed bot's card |
 | Stats | hunting pace, factions, roles, busiest zones, today against yesterday, dead bots, level spread, stuck bots and crashes, experience per hour, leaderboard, spells cast, class ranking |
-| Chat & Loot | the live chat feed (searchable, refreshed every 5 s), the most talkative bots, and the epics they find |
-| Settings | the bot settings that matter, explained, with a warning when another setting cancels one out, and one-click recipes |
+| Chat & Loot | the live chat feed (searchable, refreshed every 5 s; private version only), the most talkative bots, and the epics they find |
+| Settings | private version only: the bot settings that matter, explained, with a warning when another setting cancels one out, and one-click recipes |
 
 Any bot name opens its sheet, as does the search box.
 
@@ -37,8 +37,25 @@ Needs Python 3.9 or later and the `mysql` client binary.
    has `Settings/database.json`.
 3. Run `python squidbots.py` and open http://localhost:8088.
 
-With `publishDir` set, a read-only copy (no Settings page, no memory or crash details) is written
-there once a minute for a web server to serve.
+## Two versions: private and public
+
+**Private** is the dashboard itself, on `http://localhost`. It has everything: Settings, the live
+chat feed with every channel, memory, crashes and the watch journal. The server listens on
+127.0.0.1 only, answers only requests addressed to that name (so a web page cannot rebind its own
+name onto it), and accepts a write only as JSON from its own page (so another site cannot post a
+form to it).
+
+**Public** is what `publishDir` receives once a minute for a web server to serve: plain files
+(`index.html`, `static/`, `worldmap.json`, `stats.json`) and no process anyone can reach. It is
+built, not filtered:
+
+- `stats.json` carries only the keys listed in `PUBLIC_KEYS` in `squidbots.py`. A figure added
+  later stays private until it is listed there.
+- Never public: what real players say (no line of chat at all; "most talkative" counts bots only),
+  memory, crashes, the watch journal, paths, configuration, errors.
+- Never public either: the extracted maps.
+- The page's private code sits between `private:start` and `private:end` markers and is removed
+  from the public files, not hidden. Publishing stops if anything private is left in them.
 
 ## Logs some cards need
 
@@ -75,22 +92,23 @@ It changes values in the module `.conf` files (`playerbots.conf`, `dynamicxp.con
 installed). It edits values in place, never adds or reorders lines, and backs the whole file up to
 `config-backups/` first. Each setting says when a change takes effect. The server reads these
 files at startup, so it is easiest to use with the server stopped. Writes are accepted from the
-machine itself only. The dashboard never writes to the game database.
+machine itself only, from the dashboard's own page. The dashboard never writes to the game database.
 
-## Map and game art
+## Map
 
-`worldmap.json` (rebuilt by `tools/gen_worldmap.py`) gives the map its zones out of the box. For
-the game's own look, press **Extract game art** (above the empty map, or under Settings) and give
-your game client folder; the dashboard usually finds it on its own. In about two minutes it writes
-the real continent and zone maps to `maps/` and the frames, buttons and class icons to `ui/`
-(about 70 MB), with nothing to install. The same from a terminal:
+`worldmap.json` (rebuilt by `tools/gen_worldmap.py`) gives the map its zones out of the box: each
+zone is a rectangle in world coordinates, with the bots as dots.
+
+For the real continent and zone maps, press **Extract maps** (above the map, or under Settings) and
+give your game client folder. In about two minutes they are written to `maps/` (about 70 MB),
+with nothing to install. The same from a terminal:
 
 ```bash
 python tools/gen_art.py --client C:\my-client --dbc C:\my-server\server\data\dbc
 ```
 
-That art is Blizzard's, so it is git-ignored and never shipped; without it the page keeps its CSS
-look.
+The maps are Blizzard's: they stay on your machine, are git-ignored, and are never published. The
+public copy draws the zone rectangles only. No other game art (interface, frames, icons) is used.
 
 Bots are placed from their last character save. Point `botStatusFile` at a `bot-status.json` that
 a worldserver module keeps current and the map follows them live.
@@ -120,5 +138,6 @@ a webhook URL in `alerte-discord.txt` next to the script.
 
 - [jealous-sound](https://github.com/jealous-sound/azerothcore-wotlk-coa) for Conquest of Azeroth
 - [mod-playerbots](https://github.com/mod-playerbots/mod-playerbots) for the bots
+- [Sass42](https://github.com/Sass42) for the pages, the map, the chat feed and the Settings page
 - Written with [Claude Code](https://claude.com/claude-code); reviewed, tested and run on a real
   server with a thousand bots.

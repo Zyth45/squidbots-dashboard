@@ -10,6 +10,7 @@ The figures come from the server database, so they follow how often characters a
 """
 import datetime
 import glob
+import hashlib
 import http.server
 import json
 import os
@@ -29,6 +30,16 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 # Without it the dashboard expects to sit in <repack>\Dashboard and publishes nothing.
 SETTINGS_FILE = os.path.join(HERE, "dashboard.json")
 SETTINGS = json.load(open(SETTINGS_FILE, encoding="utf-8-sig")) if os.path.exists(SETTINGS_FILE) else {}
+# Optional build.json next to this file: which core and which pull requests this server is running.
+# Only a test realm has one; without it the page is exactly what it always was.
+BUILD_FILE = os.path.join(HERE, "build.json")
+
+# By absolute path: a scheduled task or a service runs with a thin PATH, where "powershell" alone is
+# not found and every lookup fails with "the system cannot find the file specified".
+POWERSHELL = os.path.join(os.environ.get("SystemRoot", r"C:\Windows"),
+                          "System32", "WindowsPowerShell", "v1.0", "powershell.exe")
+if not os.path.exists(POWERSHELL):
+    POWERSHELL = "powershell"
 def find_repack():
     # <repack>\Dashboard or <repack>\CoA-Bots\Dashboard: the first parent holding the repack settings.
     folder = os.path.dirname(HERE)
@@ -70,8 +81,6 @@ def find_config_dir():
 
 CONFIG_DIR = SETTINGS.get("configDir") or find_config_dir()
 CONFIG_BACKUPS = os.path.join(HERE, "config-backups")
-# The game's own UI art, extracted by tools/gen_uiart.py (git-ignored, like the maps).
-UI_DIR = os.path.join(HERE, "ui")
 STATIC_TYPES = {".css": "text/css; charset=utf-8", ".js": "application/javascript; charset=utf-8",
                 ".woff2": "font/woff2"}
 CACHE_SECONDS = 20
@@ -153,8 +162,11 @@ def action_usage(hours=24):
         "dispels": top("dispel"),
     }
 
-def chat_stats(hours=24, limit=12):
+def chat_stats(hours=24, limit=12, bots=None):
     """Who talked and how much over the last `hours`, from Chat.log.
+
+    With `bots` (a set of bot names), "bots" holds the same tally restricted to lines those bots said:
+    that is the only part the public copy may carry, since real players are never published.
 
     Lines look like "Player Name says (language 0): ..." or "Player Name tells channel Zone: ...".
     A line with no date is kept: the appender writes one, and an old file simply reads as recent.
@@ -162,7 +174,8 @@ def chat_stats(hours=24, limit=12):
     if not os.path.exists(CHAT_LOG):
         return None
     since = time.time() - hours * 3600
-    talkers, kinds, first = {}, {}, None
+    tallies = {"all": ({}, {}), "bots": ({}, {})}
+    first = None
     with open(CHAT_LOG, "rb") as handle:
         handle.seek(0, os.SEEK_END)
         handle.seek(max(0, handle.tell() - CHAT_TAIL))
@@ -180,20 +193,28 @@ def chat_stats(hours=24, limit=12):
         kind = ("channel" if rest.startswith("tells channel ") else "whisper" if rest.startswith("tells ")
                 else "say" if rest.startswith("says") else "yell" if rest.startswith("yells")
                 else "emote" if rest.startswith("emotes") else "group")
-        talker = talkers.setdefault(name, {"name": name, "messages": 0, "channel": 0})
-        talker["messages"] += 1
-        if kind == "channel":
-            talker["channel"] += 1
-        kinds[kind] = kinds.get(kind, 0) + 1
-    ordered = sorted(talkers.values(), key=lambda t: t["messages"], reverse=True)
-    return {
-        "hours": hours,
-        "since": round(first) if first else None,
-        "messages": sum(kinds.values()),
-        "talkers": len(talkers),
-        "kinds": [{"kind": k, "count": n} for k, n in sorted(kinds.items(), key=lambda kv: kv[1], reverse=True)],
-        "top": ordered[:limit],
-    }
+        for scope in ("all", "bots") if bots is not None and name in bots else ("all",):
+            talkers, kinds = tallies[scope]
+            talker = talkers.setdefault(name, {"name": name, "messages": 0, "channel": 0})
+            talker["messages"] += 1
+            if kind == "channel":
+                talker["channel"] += 1
+            kinds[kind] = kinds.get(kind, 0) + 1
+
+    def summary(talkers, kinds):
+        ordered = sorted(talkers.values(), key=lambda t: t["messages"], reverse=True)
+        return {
+            "hours": hours,
+            "since": round(first) if first else None,
+            "messages": sum(kinds.values()),
+            "talkers": len(talkers),
+            "kinds": [{"kind": k, "count": n} for k, n in sorted(kinds.items(), key=lambda kv: kv[1], reverse=True)],
+            "top": ordered[:limit],
+        }
+    out = summary(*tallies["all"])
+    if bots is not None:
+        out["bots"] = summary(*tallies["bots"])
+    return out
 
 
 # The live chat feed. Formats, after the appender's "YYYY-MM-DD HH:MM:SS " prefix:
@@ -223,6 +244,8 @@ CHAT_FORMS = [
     (re.compile(r"^tells ([^\s:]+): (.*)$"), "whisper", None),     # older cores' whisper form
 ]
 CHAT_FIRST_READ = 2 * 1024 * 1024
+# The client's link and colour codes: "|cffffff00|Hquest:123:4|h[Name]|h|r" reads "[Name]".
+CHAT_CODES_RE = re.compile(r"\|c[0-9a-fA-F]{8}|\|r|\|H[^|]*\|h|\|h")
 
 
 def parse_chat_line(line):
@@ -247,6 +270,7 @@ def parse_chat_line(line):
         if channel is not None:
             entry["channel"] = channel(form) if callable(channel) else channel
         break
+    entry["text"] = CHAT_CODES_RE.sub("", entry["text"])
     return entry
 
 
@@ -418,7 +442,11 @@ TANK = {9, 17, 21, 22, 48, 52, 57, 60, 96, 97, 99, 100}
 
 def mysql(query):
     if SETTINGS.get("mysqlArgs"):
-        exe = SETTINGS.get("mysqlExe", "C:/Program Files/MySQL/MySQL Server 8.4/bin/mysql.exe")
+        # Without "mysqlExe", look for the client inside the repack rather than at a path that only
+        # exists on the machine this was written on: a server with its own bundled MySQL has no other.
+        exe = SETTINGS.get("mysqlExe") or next(
+            glob.iglob(os.path.join(ROOT, "**", "mysql.exe"), recursive=True),
+            "C:/Program Files/MySQL/MySQL Server 8.4/bin/mysql.exe")
         login = list(SETTINGS["mysqlArgs"])
     else:
         password = json.load(open(os.path.join(ROOT, "Settings", "database.json"), encoding="utf-8"))["rootPassword"]
@@ -444,7 +472,7 @@ def server_state():
     try:
         if SETTINGS.get("worldserverPath"):
             # Several worldservers run on this PC: follow the one at that path.
-            out = subprocess.run(["powershell", "-NoProfile", "-Command",
+            out = subprocess.run([POWERSHELL, "-NoProfile", "-Command",
                                   "Get-Process worldserver -ErrorAction SilentlyContinue | Where-Object Path -eq '%s' | "
                                   "ForEach-Object { [int]($_.WorkingSet64 / 1MB) }" % SETTINGS["worldserverPath"]],
                                  capture_output=True, text=True, timeout=15).stdout.split()
@@ -688,7 +716,15 @@ class Stats:
                 k = (b["cls"], b["spec"], b["role"])
                 specs[k] = specs.get(k, 0) + 1
 
+        build = None
+        if os.path.exists(BUILD_FILE):
+            try:
+                build = json.load(open(BUILD_FILE, encoding="utf-8-sig"))
+            except (OSError, ValueError):
+                build = None
+
         return {
+            "build": build,
             "generatedAt": datetime.datetime.now().strftime("%H:%M:%S"),
             "generatedTs": round(time.time()),
             "server": server_state(),
@@ -711,7 +747,7 @@ class Stats:
                                 for f in ("alliance", "horde")},
             },
             "xpRate": {"hours": round((now - oldest["ts"]) / 3600.0, 1) if oldest else 0, "top": gains[:10]},
-            "chat": chat_stats(),
+            "chat": chat_stats(bots={b["name"] for b in bots}),
             "watch": {
                 "deadNow": sum(1 for b in online if b["dead"]),
                 "stuck": None if stuck is None else len(stuck),
@@ -751,31 +787,74 @@ def write_atomic(path, body):
     os.replace(temporary, path)
 
 
+# What pclab.fr/bots and any other public copy may carry, key by key. A key added to the stats
+# later stays on this machine until it is listed here: the public copy is chosen, not filtered.
+PUBLIC_KEYS = ("build", "generatedAt", "generatedTs", "totals", "session", "uptime", "history", "actions",
+               "top", "roles", "factions", "xpRate", "zones", "compare", "footer", "classNames", "bots",
+               "loot", "classes", "levels", "specs")
+
+
 def public_copy(data):
-    """Stats for the public page: whether the server runs, no memory, crash or error details."""
-    public = dict(data)
-    public["server"] = {"running": bool(data.get("server", {}).get("running"))}
-    public.pop("error", None)
+    """Stats for the public page. Never: real players' chat, memory, crashes, the watch journal,
+    paths, configuration or error text."""
+    public = {key: data[key] for key in PUBLIC_KEYS if key in data}
+    public["server"] = {"running": bool((data.get("server") or {}).get("running"))}
+    watch = data.get("watch") or {}
+    public["watch"] = {key: watch.get(key) for key in ("deadNow", "stuck", "stuckNames")}
+    # Only what bots said, counted: no line of text, and no real player's name.
+    public["chat"] = (data.get("chat") or {}).get("bots")
     return public
 
 
+# Code between these markers only works against the local server (settings, map extraction, the live chat
+# feed, live status). The public copy is built without it, so it is absent there, not just hidden.
+PRIVATE_JS = re.compile(r"/\* private:start \*/.*?/\* private:end \*/", re.S)
+PRIVATE_HTML = re.compile(r"<!-- private:start -->.*?<!-- private:end -->", re.S)
+# Nothing of the kind may survive into a public file; publishing stops if one does.
+PRIVATE_LEFT = re.compile(r"/api/|private:(?:start|end)|id=\"(?:settings|feedCard|artPrompt|artPanel)\"")
+
+
+def public_files():
+    """{relative path: bytes} of the public page, checked for private leftovers."""
+    def read(*parts):
+        return open(os.path.join(HERE, *parts), "rb").read()
+
+    script = PRIVATE_JS.sub("", read("static", "dashboard.js").decode("utf-8"))
+    script = script.replace('const API = "/api/stats";', 'const API = "stats.json";', 1)                    .replace("const PUBLIC = false;", "const PUBLIC = true;", 1)
+    style = read("static", "dashboard.css")
+    page = PRIVATE_HTML.sub("", read("index.html").decode("utf-8"))
+    # A visitor's browser keeps the old script and style otherwise: name each by its content.
+    for name, body in (("dashboard.js", script.encode("utf-8")), ("dashboard.css", style)):
+        page = page.replace('"static/%s"' % name,
+                            '"static/%s?v=%s"' % (name, hashlib.sha1(body).hexdigest()[:10]), 1)
+    for name, text in (("index.html", page), ("dashboard.js", script)):
+        left = PRIVATE_LEFT.search(text)
+        if left:
+            raise RuntimeError("private code left in the public %s: %r" % (name, left.group(0)))
+    if "const PUBLIC = true;" not in script:
+        raise RuntimeError("the public dashboard.js is not switched to its public mode")
+
+    files = {"index.html": page.encode("utf-8"), "static/dashboard.js": script.encode("utf-8"),
+             "static/dashboard.css": style}
+    if os.path.exists(os.path.join(HERE, "worldmap.json")):
+        files["worldmap.json"] = read("worldmap.json")          # zone outlines only, no game art
+    fonts = os.path.join(HERE, "static", "fonts")
+    for name in os.listdir(fonts):
+        files["static/fonts/" + name] = read("static", "fonts", name)
+    return files
+
+
 def publish_static():
-    """Copy the page to the public folder, with the script pointed at the static
-    stats.json and switched to its read-only mode."""
-    static_out = os.path.join(PUBLISH_DIR, "static")
-    os.makedirs(static_out, exist_ok=True)
-    write_atomic(os.path.join(PUBLISH_DIR, "index.html"),
-                 open(os.path.join(HERE, "index.html"), "rb").read())
-    write_atomic(os.path.join(static_out, "dashboard.css"),
-                 open(os.path.join(HERE, "static", "dashboard.css"), "rb").read())
-    script = open(os.path.join(HERE, "static", "dashboard.js"), encoding="utf-8").read()
-    script = script.replace('const API = "/api/stats";', 'const API = "stats.json";') \
-                   .replace("const PUBLIC = false;", "const PUBLIC = true;")
-    write_atomic(os.path.join(static_out, "dashboard.js"), script.encode("utf-8"))
-    fonts_in, fonts_out = os.path.join(HERE, "static", "fonts"), os.path.join(static_out, "fonts")
-    os.makedirs(fonts_out, exist_ok=True)
-    for name in os.listdir(fonts_in):
-        write_atomic(os.path.join(fonts_out, name), open(os.path.join(fonts_in, name), "rb").read())
+    """Copy the public page to PUBLISH_DIR, unchanged files left alone."""
+    for relative, body in public_files().items():
+        target = os.path.join(PUBLISH_DIR, *relative.split("/"))
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+        try:
+            if open(target, "rb").read() == body:
+                continue
+        except OSError:
+            pass
+        write_atomic(target, body)
 
 
 def publish_loop():
@@ -783,11 +862,11 @@ def publish_loop():
         try:
             data = STATS.get()
             os.makedirs(PUBLISH_DIR, exist_ok=True)
+            publish_static()
             write_atomic(os.path.join(PUBLISH_DIR, "stats.json"),
                          json.dumps(public_copy(data), ensure_ascii=False).encode("utf-8"))
-            publish_static()
         except Exception as error:  # the NAS may be asleep or unreachable: retry next minute
-            print("Public copy failed (NAS asleep or unreachable):", error, flush=True)
+            print("Public copy failed:", error, flush=True)
         time.sleep(PUBLISH_EVERY)
 
 
@@ -815,7 +894,8 @@ def config_payload():
     }
 
 
-# The game art: tools/gen_art.py reads the player's own client and writes ui/ and maps/.
+# The maps: tools/gen_art.py reads the player's own client and writes maps/ (maps only,
+# no interface art).
 # The page's button runs it here, in a child process with this same Python, so nothing
 # needs installing. One run at a time; its progress is kept for GET /api/art.
 ART_TOOL = os.path.join(HERE, "tools", "gen_art.py")
@@ -846,12 +926,11 @@ def guess_client():
 
 
 def art_status():
-    """What art is on disk, the current or last run, and a client folder to suggest."""
+    """What maps are on disk, the current or last run, and a client folder to suggest."""
     maps = glob.glob(os.path.join(HERE, "maps", "*.png")) + glob.glob(os.path.join(HERE, "maps", "zones", "*.png"))
     with ART_LOCK:
         job = dict(ART_JOB, log=ART_JOB["log"][-12:])
     return {
-        "ui": os.path.isfile(os.path.join(UI_DIR, "manifest.json")),
         "maps": len(maps),
         "job": job,
         "suggestedClient": guess_client(),
@@ -920,14 +999,36 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self._send(json.dumps(payload, ensure_ascii=False).encode("utf-8"),
                    "application/json; charset=utf-8", status)
 
+    # The server binds to 127.0.0.1, but a web page open in the same browser can still reach it:
+    # a foreign site can POST a form to localhost (CSRF), or point its own name at 127.0.0.1 and
+    # read the answers (DNS rebinding). So every request must name this server in Host, and a
+    # write must also come from this page (Origin) with a JSON body, which no form can send.
+    def _allowed_hosts(self):
+        return {"%s:%d" % (name, PORT) for name in ("127.0.0.1", "localhost", "[::1]")}
+
+    def _own_host(self):
+        if (self.headers.get("Host") or "").lower() in self._allowed_hosts():
+            return True
+        self._json({"error": "unknown host"}, 403)
+        return False
+
     def _local_only(self):
-        # The server already binds to 127.0.0.1; this is the second lock on writes.
+        origin = (self.headers.get("Origin") or "").lower()
+        content_type = (self.headers.get("Content-Type") or "").split(";")[0].strip().lower()
         if self.client_address[0] not in ("127.0.0.1", "::1"):
             self._json({"error": "writes are allowed from this machine only"}, 403)
+            return False
+        if origin and origin not in {"http://" + host for host in self._allowed_hosts()}:
+            self._json({"error": "writes are allowed from this dashboard's own page only"}, 403)
+            return False
+        if content_type != "application/json":
+            self._json({"error": "expected Content-Type: application/json"}, 415)
             return False
         return True
 
     def do_GET(self):
+        if not self._own_host():
+            return
         path = self.path.split("?")[0]
         if path == "/api/stats":
             self._json(STATS.get())
@@ -987,21 +1088,6 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 self.send_error(404)
                 return
             self._send(open(target, "rb").read(), kind)
-        elif path.startswith("/ui/"):
-            # Client UI art from tools/gen_uiart.py: "<stem>.png" and manifest.json only.
-            leaf = path[len("/ui/"):]
-            if leaf == "manifest.json":
-                kind = "application/json; charset=utf-8"
-            elif re.match(r"^[a-z0-9-]+\.png$", leaf):
-                kind = "image/png"
-            else:
-                self.send_error(404)
-                return
-            target = os.path.join(UI_DIR, leaf)
-            if not os.path.exists(target):
-                self.send_error(404)
-                return
-            self._send(open(target, "rb").read(), kind)
         elif path in ("/", "/index.html"):
             self._send(open(os.path.join(HERE, "index.html"), "rb").read(),
                        "text/html; charset=utf-8")
@@ -1009,6 +1095,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.send_error(404)
 
     def do_POST(self):
+        if not self._own_host():
+            return
         path = self.path.split("?")[0]
         if path == "/api/art":
             if not self._local_only():
