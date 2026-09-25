@@ -393,29 +393,56 @@ def loot_feed(limit=12, hours=48):
     return {"hours": hours, "total": len(found), "rows": found[::-1][:limit]}
 
 
-# Optional live snapshot of every online bot (bot-status.json), written every few seconds by a
-# worldserver module that exports one. Unlike the characters table it is current, and it
-# carries what each bot is doing, so the map's hover cards read it. Without it the map and
+# Optional live snapshot of every online bot (bot-status.json), written every few seconds by
+# mod-playerbots when AiPlayerbot.CoaStatusFile names it. Unlike the characters table it is current,
+# and it carries what each bot is doing, so the map's hover cards read it. Without it the map and
 # the roster fall back to the characters table, which follows the save interval.
 STATUS_FILE = SETTINGS.get("botStatusFile") or os.path.join(os.path.dirname(COA_LOG), "bot-status.json")
 STATUS_STALE = 60   # seconds; older than this the server has stopped writing it
 
 
-def live_status():
-    """{"at", "age", "bots"} from the module's snapshot; {"bots": [], "absent": True} on a realm with no
-    such module (the usual case: nothing in the repack writes it); {"bots": [], "missing": reason} when
-    the file is there but stale or unreadable."""
-    if not os.path.exists(STATUS_FILE):
-        return {"bots": [], "absent": True}
+# The last snapshot read: (mtime_ns, size), its "at", and its bots already encoded, so the file is
+# parsed once per snapshot however many pages ask for it.
+_LIVE_CACHE = {"key": None, "at": 0, "bots": b"[]"}
+_LIVE_LOCK = threading.Lock()
+
+
+def live_status_body():
+    """The /api/live answer, as JSON bytes: {"at", "age", "bots"} from the module's snapshot;
+    {"bots": [], "absent": true} on a realm with no such module (the usual case: nothing in the repack
+    writes it); {"bots": [], "missing": reason} when the file is there but stale or unreadable."""
+    def answer(payload):
+        return json.dumps(payload, ensure_ascii=False).encode("utf-8")
+
     try:
-        with open(STATUS_FILE, encoding="utf-8", errors="replace") as handle:
-            data = json.load(handle)
-    except (OSError, ValueError) as error:
-        return {"bots": [], "missing": "status file unreadable: %s" % error}
-    age = max(0, round(time.time() - float(data.get("at") or 0)))
+        stat = os.stat(STATUS_FILE)
+    except FileNotFoundError:
+        return answer({"bots": [], "absent": True})
+    except OSError as error:
+        return answer({"bots": [], "missing": "status file unreadable: %s" % error})
+    key = (stat.st_mtime_ns, stat.st_size)
+    with _LIVE_LOCK:
+        if _LIVE_CACHE["key"] != key:
+            # The writer renames a new copy over the file; on Windows an open that lands during that
+            # swap is refused, so a refused open is tried again a moment later before the card says so.
+            for attempt in range(3):
+                try:
+                    with open(STATUS_FILE, "rb") as handle:
+                        data = json.loads(handle.read().decode("utf-8", errors="replace"))
+                    break
+                except PermissionError as error:
+                    if attempt == 2:
+                        return answer({"bots": [], "missing": "status file unreadable: %s" % error})
+                    time.sleep(0.05)
+                except (OSError, ValueError) as error:
+                    return answer({"bots": [], "missing": "status file unreadable: %s" % error})
+            _LIVE_CACHE.update(key=key, at=data.get("at") or 0,
+                               bots=answer(data.get("bots") or []))
+        at, bots = _LIVE_CACHE["at"], _LIVE_CACHE["bots"]
+    age = max(0, round(time.time() - float(at)))
     if age > STATUS_STALE:
-        return {"bots": [], "missing": "status file is %d s old; is the server running?" % age}
-    return {"at": data.get("at"), "age": age, "bots": data.get("bots") or []}
+        return answer({"bots": [], "missing": "status file is %d s old; is the server running?" % age})
+    return b'{"at": %d, "age": %d, "bots": ' % (int(at), age) + bots + b"}"
 
 
 # Journal of the watcher (Surveiller-Et-Relancer.ps1): restarts and freezes, most recent first.
@@ -1046,7 +1073,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         elif path == "/api/art":
             self._json(art_status())
         elif path == "/api/live":
-            self._json(live_status())
+            self._send(live_status_body(), "application/json; charset=utf-8")
         elif path == "/api/chat":
             query = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
             first = lambda key: (query.get(key) or [None])[0]  # noqa: E731

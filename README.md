@@ -110,8 +110,19 @@ python tools/gen_art.py --client C:\my-client --dbc C:\my-server\server\data\dbc
 The maps are Blizzard's: they stay on your machine, are git-ignored, and are never published. The
 public copy draws the zone rectangles only. No other game art (interface, frames, icons) is used.
 
-Bots are placed from their last character save. Point `botStatusFile` at a `bot-status.json` that
-a worldserver module keeps current and the map follows them live.
+Bots are placed from their last character save. For live positions, and for what each bot is doing
+on its card (health, power, task, group, quests), let mod-playerbots write a `bot-status.json` every
+few seconds and point `botStatusFile` in `dashboard.json` at it:
+
+```ini
+# configs/modules/playerbots.conf
+AiPlayerbot.CoaStatusFile = "C:/my-server/server/logs/bot-status.json"
+AiPlayerbot.CoaStatusIntervalSeconds = 5
+```
+
+It is off by default. With 1000 bots online a snapshot costs under a millisecond of the world
+update, and the disk write runs on a thread of its own. A file older than 60 s is treated as stale
+(the server has stopped writing it).
 
 ## The watchman
 

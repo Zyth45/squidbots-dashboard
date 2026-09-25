@@ -89,6 +89,13 @@ SETTINGS = [Setting(*row) for row in (
     ("AiPlayerbot.CoaLfgBots", PLAYERBOTS, "CoA Bots", "Bots answer \"lfg bot\" in chat", "bool", None, "reload",
      "A player who says \"lfg bot heal\", \"lfg bot tank\" or \"lfg bot\" in a listened channel is whispered by free bots able to play those roles."),
 
+    # The live view of this dashboard: mod-playerbots (branch coa) writes a snapshot of every bot.
+    ("AiPlayerbot.CoaStatusFile", PLAYERBOTS, "Dashboard live view", "Live status file", "quoted", None, "reload",
+     "Where the server writes each bot's health, power and current action for this dashboard's map and cards. "
+     "Put it next to CoaBots.log (logs\bot-status.json) and the dashboard finds it by itself. Empty: not written."),
+    ("AiPlayerbot.CoaStatusIntervalSeconds", PLAYERBOTS, "Dashboard live view", "Refresh every (seconds)", "int", None, "reload",
+     "How often the live status file is rewritten. Under a millisecond of server time per snapshot with 1000 bots."),
+
     # Channels and bot chat. Conquest of Azeroth numbers and names its channels differently from a
     # stock client: with the stock values bot broadcasts are dropped or land in the wrong channel.
     ("AiPlayerbot.ZoneChannelId", PLAYERBOTS, "Channels and chat", "Zone channel number", "int", None, "restart",
@@ -271,7 +278,7 @@ def validate(key, value):
         return "unknown setting"
     kind, choices = entry[4], entry[5]
     text = str(value).strip()
-    if text == "":
+    if text == "" and kind != "quoted":
         return "value is empty"
     if kind == "bool":
         if text not in ("0", "1"):

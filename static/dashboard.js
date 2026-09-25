@@ -883,9 +883,10 @@ document.getElementById("topTabs").addEventListener("click", event => {
 let WORLD = null;
 let MAP_ID = "0";
 let ZOOM_ZONE = null;
-// Live snapshot from mod-bot-minds (bot-status.json, read by the local server): current position,
-// health and what each bot is doing. Keyed by name. Empty when the server is down or
-// no module writes bot-status.json, and the map falls back to the characters table.
+// Live snapshot (bot-status.json, written by mod-playerbots when AiPlayerbot.CoaStatusFile is set,
+// read by the local server): current position, health and what each bot is doing. Keyed by name.
+// Empty when the server is down or nothing writes bot-status.json, and the map falls back to the
+// characters table.
 let LIVE = { byName: {}, age: null, missing: null };
 // Bumped when the extracted art changes shape. An early build served the maps with
 // a one day max-age, so a stale 1024x768 copy would otherwise sit in the browser
@@ -1210,7 +1211,10 @@ document.getElementById("mapTabs").addEventListener("click", event => {
 
 // Live positions and tasks move faster than the 20 s stats refresh. Skip a redraw
 // while a card is pinned so it does not vanish under the reader.
+// Only the World and Bots pages show live data: elsewhere, or in a hidden tab, nothing is fetched,
+// and coming back fetches at once.
 async function refreshLiveMap() {
+  if (document.hidden || (PAGE !== "world" && PAGE !== "bots")) return;
   await refreshLive();
   const card = document.getElementById("botCard");
   if (LAST && !(card && !card.hidden)) renderMap(LAST);
@@ -1721,5 +1725,7 @@ loadArt();/* private:end */
 refresh();
 setInterval(refresh, 20000);
 setInterval(refreshLiveMap, 5000);
+window.addEventListener("hashchange", refreshLiveMap);
+document.addEventListener("visibilitychange", refreshLiveMap);
 // The chat feed follows the log only while its page is open.
 /* private:start */setInterval(() => { if (PAGE === "chat" && !document.hidden) loadFeed(); }, 5000);/* private:end */

@@ -21,7 +21,7 @@
   "_comment_settings": "The Settings page edits the module .conf files in this folder. By default it looks in the repack's CoA-Bots\\Core\\configs\\modules, then Core\\configs\\modules.",
   "configDir": "C:\\my-server\\server\\configs\\modules",
 
-  "_comment_live": "Optional: a bot-status.json that a worldserver module writes every few seconds, for live positions and what each bot is doing. Without it the map uses the last character save.",
+  "_comment_live": "Optional: the bot-status.json that mod-playerbots writes every few seconds when AiPlayerbot.CoaStatusFile names it (playerbots.conf), for live positions and what each bot is doing. Without it the map uses the last character save.",
   "botStatusFile": "C:\\my-server\\server\\logs\\bot-status.json",
 
   "_comment_dates": "uptimeSince counts the server hours from that date; countFrom makes every figure start there instead of at the bots' creation.",
