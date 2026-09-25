@@ -18,6 +18,7 @@ import struct
 import subprocess
 import threading
 import time
+import urllib.parse
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 # Optional dashboard.json next to this file: {"repack": ..., "publishDir": ..., "uptimeSince": ...}.
@@ -42,6 +43,37 @@ ROOT = SETTINGS.get("repack") or find_repack()
 BUILDS = next((p for p in (os.path.join(HERE, "coa-level-builds.json"), r"C:\CoA-Build\coa-level-builds.json")
                if os.path.exists(p)), os.path.join(HERE, "coa-level-builds.json"))
 PORT = int(os.environ.get("COA_DASHBOARD_PORT") or SETTINGS.get("port") or 8088)
+
+# Bot settings the dashboard can edit. The .conf files are read by the server at
+# startup, so editing them while it is stopped is the simplest way to configure a
+# realm: no reload, no restart beyond the one you were going to do anyway.
+#
+# The repack runs this with its bundled Python, which is an embedded distribution:
+# python3xx._pth takes full control of sys.path and the script's own directory is
+# never added, so a plain "import botconfig" fails there. Add it explicitly.
+import sys
+
+if HERE not in sys.path:
+    sys.path.insert(0, HERE)
+import botconfig
+
+
+def find_config_dir():
+    # The bots server keeps its own module configs; prefer those, fall back to the
+    # base server's so a repack without CoA-Bots still gets a usable panel.
+    for bots in (True, False):
+        folder = botconfig.config_dir(ROOT, bots=bots)
+        if os.path.isdir(folder):
+            return folder
+    return botconfig.config_dir(ROOT, bots=True)
+
+
+CONFIG_DIR = SETTINGS.get("configDir") or find_config_dir()
+CONFIG_BACKUPS = os.path.join(HERE, "config-backups")
+# The game's own UI art, extracted by tools/gen_uiart.py (git-ignored, like the maps).
+UI_DIR = os.path.join(HERE, "ui")
+STATIC_TYPES = {".css": "text/css; charset=utf-8", ".js": "application/javascript; charset=utf-8",
+                ".woff2": "font/woff2"}
 CACHE_SECONDS = 20
 HISTORY_FILE = os.path.join(HERE, "history.json")
 HISTORY_EVERY = 10 * 60        # one point every 10 minutes
@@ -164,6 +196,118 @@ def chat_stats(hours=24, limit=12):
     }
 
 
+# The live chat feed. Formats, after the appender's "YYYY-MM-DD HH:MM:SS " prefix:
+#   AzerothCore chat_log.cpp (only with ChatLog.Enable = 1 and the chat.* loggers on the Chat appender):
+#     Player A says (language 0): ...          Player A yells (language 0): ...
+#     Player A emotes (language 0): ...        Player A whisper B: ...
+#     Player A tells party with leader B: ...  (also raid, bg; "Leader player A ..." for the leader;
+#                                               "Player A sends raid warning raid with leader B: ...")
+#     Player A tells guild "Name": ...         Player A tells guild.officer "Name": ...
+#     Player A tells channel General - Elwynn Forest: ...
+#   mod-bot-minds off-screen conversations (playerbots.chat):
+#     Player A says to B: ...
+CHAT_KINDS = ("say", "yell", "whisper", "party", "guild", "channel", "offscreen", "other")
+CHAT_LINE_RE = re.compile(r"^(?:(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d)\s+)?(?:Leader player|Player) (\S+) (.+)$")
+CHAT_FORMS = [
+    # (pattern on the rest of the line, kind, channel: fixed text or a function of the match)
+    (re.compile(r"^says to ([^\s:]+): (.*)$"), "offscreen", None),
+    (re.compile(r"^says \(language \d+\): (.*)$"), "say", None),
+    (re.compile(r"^yells \(language \d+\): (.*)$"), "yell", None),
+    (re.compile(r"^emotes \(language \d+\): (.*)$"), "other", "emote"),
+    (re.compile(r"^whisper (\S+): (.*)$"), "whisper", None),
+    (re.compile(r"^tells (party|raid|bg) with leader \S+: (.*)$"), "party", lambda m: m.group(1)),
+    (re.compile(r"^sends raid warning raid with leader \S+: (.*)$"), "party", "raid warning"),
+    (re.compile(r'^tells guild "(.*?)": (.*)$'), "guild", lambda m: m.group(1)),
+    (re.compile(r'^tells guild\.officer "(.*?)": (.*)$'), "guild", lambda m: m.group(1) + " officers"),
+    (re.compile(r"^tells channel ([^:]+): (.*)$"), "channel", lambda m: m.group(1)),
+    (re.compile(r"^tells ([^\s:]+): (.*)$"), "whisper", None),     # older cores' whisper form
+]
+CHAT_FIRST_READ = 2 * 1024 * 1024
+
+
+def parse_chat_line(line):
+    """One Chat.log line as {"at", "speaker", "kind", "channel", "target", "text"}, or None.
+
+    "at" is None for a line with no date; a line that is not somebody talking (a message that ran
+    over a newline, anything else) is None.
+    """
+    match = CHAT_LINE_RE.match(line.strip())
+    if not match:
+        return None
+    stamp, speaker, rest = match.groups()
+    entry = {"at": stamp, "speaker": speaker, "kind": "other", "channel": None, "target": None, "text": rest}
+    for pattern, kind, channel in CHAT_FORMS:
+        form = pattern.match(rest)
+        if not form:
+            continue
+        entry["kind"] = kind
+        entry["text"] = form.group(form.lastindex)
+        if kind in ("offscreen", "whisper"):
+            entry["target"] = form.group(1)
+        if channel is not None:
+            entry["channel"] = channel(form) if callable(channel) else channel
+        break
+    return entry
+
+
+def chat_filter(kind=None, q=None, bot=None):
+    """A test on parsed lines: `kind` one kind or several joined by commas, `q` a case-insensitive
+    search on speaker, target and text, `bot` lines said by that character or to it."""
+    kinds = {k.strip().lower() for k in kind.split(",") if k.strip()} if kind else None
+    wanted = q.strip().lower() if q and q.strip() else None
+    who = bot.strip().lower() if bot and bot.strip() else None
+
+    def keep(entry):
+        if kinds is not None and entry["kind"] not in kinds:
+            return False
+        if who and who not in (entry["speaker"].lower(), (entry["target"] or "").lower()):
+            return False
+        if wanted and not any(wanted in (entry[key] or "").lower() for key in ("speaker", "target", "text")):
+            return False
+        return True
+    return keep
+
+
+def read_chat_tail(path, limit=100, keep=None, start=CHAT_FIRST_READ, cap=CHAT_TAIL):
+    """The last `limit` lines of the chat log that pass `keep`, newest first.
+
+    Only the end of the file is read: `start` bytes first, doubled while too few lines match,
+    never more than `cap`. A line the window cuts in half is left out.
+    """
+    if not os.path.exists(path):
+        return []
+    with open(path, "rb") as handle:
+        handle.seek(0, os.SEEK_END)
+        size = handle.tell()
+        window = min(start, cap)
+        while True:
+            window = min(window, size, cap)
+            handle.seek(size - window)
+            lines = handle.read(window).decode("utf-8", "replace").splitlines()
+            if window < size:
+                lines = lines[1:]                  # the first line may be cut in half
+            found = []
+            for line in reversed(lines):
+                entry = parse_chat_line(line)
+                if entry and (keep is None or keep(entry)):
+                    found.append(entry)
+                    if len(found) >= limit:
+                        return found
+            if window >= size or window >= cap:
+                return found
+            window *= 2
+
+
+def chat_feed(limit=100, kind=None, q=None, bot=None, path=None):
+    """GET /api/chat: the newest chat lines, filtered, at most 500."""
+    try:
+        limit = int(limit)
+    except (TypeError, ValueError):
+        limit = 100
+    limit = max(1, min(500, limit))
+    return {"lines": read_chat_tail(path or CHAT_LOG, limit, chat_filter(kind, q, bot))}
+
+
 # Zone names, from the worldserver's own AreaTable.dbc: characters.zone holds an area id.
 DBC_DIR = SETTINGS.get("dbcDir") or next(
     (p for p in (os.path.join(ROOT, "data", "dbc"), os.path.join(ROOT, "Core", "data", "dbc")) if os.path.isdir(p)),
@@ -216,6 +360,29 @@ def loot_feed(limit=12, hours=48):
         found.append({"ts": round(when), "bot": name, "cls": int(cls), "level": int(level), "item": item,
                       "itemId": int(item_id), "quality": int(quality), "ilvl": int(ilvl), "count": int(count)})
     return {"hours": hours, "total": len(found), "rows": found[::-1][:limit]}
+
+
+# Optional live snapshot of every online bot (bot-status.json), written every few seconds by a
+# worldserver module that exports one. Unlike the characters table it is current, and it
+# carries what each bot is doing, so the map's hover cards read it. Without it the map and
+# the roster fall back to the characters table, which follows the save interval.
+STATUS_FILE = SETTINGS.get("botStatusFile") or os.path.join(os.path.dirname(COA_LOG), "bot-status.json")
+STATUS_STALE = 60   # seconds; older than this the server has stopped writing it
+
+
+def live_status():
+    """{"at", "age", "bots"} from the module's snapshot, or {"bots": [], "missing": reason}."""
+    if not os.path.exists(STATUS_FILE):
+        return {"bots": [], "missing": "no status file (set BotMinds.Status.File)"}
+    try:
+        with open(STATUS_FILE, encoding="utf-8", errors="replace") as handle:
+            data = json.load(handle)
+    except (OSError, ValueError) as error:
+        return {"bots": [], "missing": "status file unreadable: %s" % error}
+    age = max(0, round(time.time() - float(data.get("at") or 0)))
+    if age > STATUS_STALE:
+        return {"bots": [], "missing": "status file is %d s old; is the server running?" % age}
+    return {"at": data.get("at"), "age": age, "bots": data.get("bots") or []}
 
 
 # Journal of the watcher (Surveiller-Et-Relancer.ps1): restarts and freezes, most recent first.
@@ -354,7 +521,8 @@ class Stats:
         self.load_names()
         rows = mysql(
             "SELECT c.name, c.class, c.level, c.xp, c.online, TRIM(IFNULL(s.data, '0')), IFNULL(k.counter, 0), "
-            "IFNULL(q.n, 0), c.totaltime, c.race, c.money, c.health, c.zone "
+            "IFNULL(q.n, 0), c.totaltime, c.race, c.money, c.health, c.zone, "
+            "c.map, c.position_x, c.position_y "
             "FROM acore_characters.characters c JOIN acore_auth.account a ON a.id = c.account "
             "LEFT JOIN acore_characters.character_settings s ON s.guid = c.guid AND s.source = 'core.ascension_active_spec' "
             "LEFT JOIN acore_characters.character_achievement_progress k ON k.guid = c.guid AND k.criteria = 5529 "
@@ -362,7 +530,8 @@ class Stats:
             "ON q.guid = c.guid "
             "WHERE a.username LIKE 'RNDBOT%'")
         bots = []
-        for name, cls, level, xp, online, spec, kills, quests, totaltime, race, money, health, zone in rows:
+        for (name, cls, level, xp, online, spec, kills, quests, totaltime, race, money, health,
+             zone, cmap, pos_x, pos_y) in rows:
             cls, spec, level, xp = int(cls), int(spec or 0), int(level), int(xp)
             bots.append({
                 "name": name, "cls": self.classes.get(cls, str(cls)), "level": level, "xp": xp,
@@ -371,6 +540,9 @@ class Stats:
                 "faction": "alliance" if int(race) in ALLIANCE_RACES else "horde",
                 "totalXp": self.xp_levels.get(level, 0) + xp,
                 "gold": int(money) / 10000.0, "dead": int(health) == 0, "zone": int(zone),
+                # Where the bot stands, for the map. These follow the character save
+                # interval like every other figure here, so they lag live movement.
+                "map": int(cmap), "x": float(pos_x), "y": float(pos_y),
             })
 
         online = [b for b in bots if b["online"]]
@@ -557,7 +729,8 @@ class Stats:
             "classNames": {str(k): v for k, v in self.classes.items()},
             "bots": [{"n": b["name"], "c": b["cls"], "s": b["spec"], "r": b["role"], "l": b["level"],
                       "k": b["kills"], "q": b["quests"], "g": round(b["gold"], 1), "o": b["online"],
-                      "f": b["faction"], "z": self.zones.get(b["zone"], ""), "h": round(b["hours"], 1)}
+                      "f": b["faction"], "z": self.zones.get(b["zone"], ""), "h": round(b["hours"], 1),
+                      "m": b["map"], "x": round(b["x"], 1), "y": round(b["y"], 1)}
                      for b in bots],
             "loot": loot_feed(),
             "classes": classes,
@@ -586,6 +759,25 @@ def public_copy(data):
     return public
 
 
+def publish_static():
+    """Copy the page to the public folder, with the script pointed at the static
+    stats.json and switched to its read-only mode."""
+    static_out = os.path.join(PUBLISH_DIR, "static")
+    os.makedirs(static_out, exist_ok=True)
+    write_atomic(os.path.join(PUBLISH_DIR, "index.html"),
+                 open(os.path.join(HERE, "index.html"), "rb").read())
+    write_atomic(os.path.join(static_out, "dashboard.css"),
+                 open(os.path.join(HERE, "static", "dashboard.css"), "rb").read())
+    script = open(os.path.join(HERE, "static", "dashboard.js"), encoding="utf-8").read()
+    script = script.replace('const API = "/api/stats";', 'const API = "stats.json";') \
+                   .replace("const PUBLIC = false;", "const PUBLIC = true;")
+    write_atomic(os.path.join(static_out, "dashboard.js"), script.encode("utf-8"))
+    fonts_in, fonts_out = os.path.join(HERE, "static", "fonts"), os.path.join(static_out, "fonts")
+    os.makedirs(fonts_out, exist_ok=True)
+    for name in os.listdir(fonts_in):
+        write_atomic(os.path.join(fonts_out, name), open(os.path.join(fonts_in, name), "rb").read())
+
+
 def publish_loop():
     while True:
         try:
@@ -593,32 +785,276 @@ def publish_loop():
             os.makedirs(PUBLISH_DIR, exist_ok=True)
             write_atomic(os.path.join(PUBLISH_DIR, "stats.json"),
                          json.dumps(public_copy(data), ensure_ascii=False).encode("utf-8"))
-            page = open(os.path.join(HERE, "index.html"), encoding="utf-8").read()
-            page = page.replace('const API = "/api/stats";', 'const API = "stats.json";') \
-                       .replace("const PUBLIC = false;", "const PUBLIC = true;")
-            write_atomic(os.path.join(PUBLISH_DIR, "index.html"), page.encode("utf-8"))
+            publish_static()
         except Exception as error:  # the NAS may be asleep or unreachable: retry next minute
             print("Public copy failed (NAS asleep or unreachable):", error, flush=True)
         time.sleep(PUBLISH_EVERY)
 
 
+def config_payload():
+    """Current bot settings, plus whether the server is up.
+
+    This never touches the database, so the settings panel works with the server
+    stopped, which is when it is most useful.
+    """
+    settings = botconfig.read_settings(CONFIG_DIR)
+    notes = []
+    # Say so when the LLM chat module's config is not there, rather than leaving a
+    # gap the user has to guess at.
+    if any(not s["present"] for s in settings if s["file"] == botconfig.BOTMINDS):
+        notes.append("LLM chat settings appear once mod-bot-minds is installed "
+                     "and its mod_bot_minds.conf is in the modules folder.")
+    return {
+        "settings": settings,
+        "warnings": botconfig.override_warnings(settings),
+        "overrides": botconfig.OVERRIDES,
+        "recipes": botconfig.RECIPES,
+        "configDir": CONFIG_DIR,
+        "serverRunning": server_state().get("running", False),
+        "notes": notes,
+    }
+
+
+# The game art: tools/gen_art.py reads the player's own client and writes ui/ and maps/.
+# The page's button runs it here, in a child process with this same Python, so nothing
+# needs installing. One run at a time; its progress is kept for GET /api/art.
+ART_TOOL = os.path.join(HERE, "tools", "gen_art.py")
+ART_LOCK = threading.Lock()
+ART_JOB = {"running": False, "step": 0, "total": 0, "label": "", "log": [], "error": None,
+           "finished": None, "client": None}
+
+
+def guess_client():
+    """A game client folder near the repack: one holding Data/common.MPQ. `gameClient` in
+    dashboard.json wins; otherwise the repack's own folder, its children and its
+    siblings are looked at, which covers the usual repack-beside-client layout."""
+    if SETTINGS.get("gameClient"):
+        return SETTINGS["gameClient"]
+    if not ROOT:
+        return None
+    parent = os.path.dirname(os.path.abspath(ROOT))
+    places = [ROOT]
+    for folder in (ROOT, parent):
+        try:
+            places += [os.path.join(folder, name) for name in sorted(os.listdir(folder))]
+        except OSError:
+            pass
+    for place in places:
+        if os.path.isfile(os.path.join(place, "Data", "common.MPQ")):
+            return place
+    return None
+
+
+def art_status():
+    """What art is on disk, the current or last run, and a client folder to suggest."""
+    maps = glob.glob(os.path.join(HERE, "maps", "*.png")) + glob.glob(os.path.join(HERE, "maps", "zones", "*.png"))
+    with ART_LOCK:
+        job = dict(ART_JOB, log=ART_JOB["log"][-12:])
+    return {
+        "ui": os.path.isfile(os.path.join(UI_DIR, "manifest.json")),
+        "maps": len(maps),
+        "job": job,
+        "suggestedClient": guess_client(),
+        "dbcDir": DBC_DIR,
+    }
+
+
+def run_art(client):
+    """Run tools/gen_art.py to the end, keeping ART_JOB current. Runs on its own thread."""
+    command = [sys.executable, "-B", ART_TOOL, "--client", client, "--dbc", DBC_DIR, "--root", HERE]
+    try:
+        child = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                 text=True, encoding="utf-8", errors="replace",
+                                 creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        for line in child.stdout:
+            line = line.rstrip()
+            with ART_LOCK:
+                match = re.match(r"^STEP (\d+)/(\d+) (.*)$", line)
+                if match:
+                    ART_JOB["step"], ART_JOB["total"] = int(match.group(1)), int(match.group(2))
+                    ART_JOB["label"] = match.group(3)
+                else:
+                    ART_JOB["log"].append(line)
+                    if line.startswith("ERROR "):
+                        ART_JOB["error"] = line[len("ERROR "):]
+        code = child.wait()
+        with ART_LOCK:
+            if code and not ART_JOB["error"]:
+                ART_JOB["error"] = (ART_JOB["log"] or ["the tool stopped with code %d" % code])[-1]
+    except OSError as error:
+        with ART_LOCK:
+            ART_JOB["error"] = "could not start the tool: %s" % error
+    with ART_LOCK:
+        ART_JOB["running"] = False
+        ART_JOB["finished"] = time.time()
+
+
+def start_art(client):
+    """Start a run; returns None, or why it cannot start."""
+    client = (client or "").strip().strip('"')
+    if not client:
+        return "Give the game client folder."
+    if not os.path.isfile(os.path.join(client, "Data", "common.MPQ")):
+        return "No Data\\common.MPQ in %s: pick the folder the game itself is installed in." % client
+    if not DBC_DIR or not os.path.isfile(os.path.join(DBC_DIR, "ChrClasses.dbc")):
+        return "The server's dbc folder was not found; set dbcDir in dashboard.json."
+    with ART_LOCK:
+        if ART_JOB["running"]:
+            return "Already running."
+        ART_JOB.update({"running": True, "step": 0, "total": 0, "label": "Starting", "log": [],
+                        "error": None, "finished": None, "client": client})
+    threading.Thread(target=run_art, args=(client,), daemon=True).start()
+    return None
+
+
 class Handler(http.server.BaseHTTPRequestHandler):
-    def do_GET(self):
-        if self.path.split("?")[0] == "/api/stats":
-            body = json.dumps(STATS.get(), ensure_ascii=False).encode("utf-8")
-            content_type = "application/json; charset=utf-8"
-        elif self.path in ("/", "/index.html"):
-            body = open(os.path.join(HERE, "index.html"), "rb").read()
-            content_type = "text/html; charset=utf-8"
-        else:
-            self.send_error(404)
-            return
-        self.send_response(200)
+    def _send(self, body, content_type, status=200):
+        self.send_response(status)
         self.send_header("Content-Type", content_type)
         self.send_header("Cache-Control", "no-store")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
+
+    def _json(self, payload, status=200):
+        self._send(json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+                   "application/json; charset=utf-8", status)
+
+    def _local_only(self):
+        # The server already binds to 127.0.0.1; this is the second lock on writes.
+        if self.client_address[0] not in ("127.0.0.1", "::1"):
+            self._json({"error": "writes are allowed from this machine only"}, 403)
+            return False
+        return True
+
+    def do_GET(self):
+        path = self.path.split("?")[0]
+        if path == "/api/stats":
+            self._json(STATS.get())
+        elif path == "/api/config":
+            self._json(config_payload())
+        elif path == "/api/art":
+            self._json(art_status())
+        elif path == "/api/live":
+            self._json(live_status())
+        elif path == "/api/chat":
+            query = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
+            first = lambda key: (query.get(key) or [None])[0]  # noqa: E731
+            self._json(chat_feed(first("limit") or 100, first("kind"), first("q"), first("bot")))
+        elif path == "/worldmap.json":
+            target = os.path.join(HERE, "worldmap.json")
+            if not os.path.exists(target):
+                self._json({"error": "worldmap.json has not been generated"}, 404)
+                return
+            self._send(open(target, "rb").read(), "application/json; charset=utf-8")
+        elif path.startswith("/maps/"):
+            # The stitched continent and zone maps, extracted from the client by
+            # tools/gen_mapart.py. Only "<id>.png" and "zones/<Folder>.png" are served.
+            leaf = path[len("/maps/"):]
+            if not re.match(r"^(?:[0-9]+|zones/[A-Za-z0-9]+)\.png$", leaf):
+                self.send_error(404)
+                return
+            target = os.path.join(HERE, "maps", *leaf.split("/"))
+            if not os.path.exists(target):
+                self.send_error(404)
+                return
+            body = open(target, "rb").read()
+            stamp = time.strftime("%a, %d %b %Y %H:%M:%S GMT",
+                                  time.gmtime(os.path.getmtime(target)))
+            if self.headers.get("If-Modified-Since") == stamp:
+                self.send_response(304)
+                self.send_header("Last-Modified", stamp)
+                self.send_header("Cache-Control", "no-cache")
+                self.end_headers()
+                return
+            self.send_response(200)
+            self.send_header("Content-Type", "image/png")
+            # Revalidate rather than cache hard: regenerating the art must show up
+            # immediately, and a 304 costs nothing.
+            self.send_header("Cache-Control", "no-cache")
+            self.send_header("Last-Modified", stamp)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+        elif path.startswith("/static/"):
+            leaf = path[len("/static/"):]
+            kind = STATIC_TYPES.get(os.path.splitext(leaf)[1])
+            if not kind or not re.match(r"^(?:fonts/)?[a-z0-9-]+\.(?:css|js|woff2)$", leaf):
+                self.send_error(404)
+                return
+            target = os.path.join(HERE, "static", *leaf.split("/"))
+            if not os.path.exists(target):
+                self.send_error(404)
+                return
+            self._send(open(target, "rb").read(), kind)
+        elif path.startswith("/ui/"):
+            # Client UI art from tools/gen_uiart.py: "<stem>.png" and manifest.json only.
+            leaf = path[len("/ui/"):]
+            if leaf == "manifest.json":
+                kind = "application/json; charset=utf-8"
+            elif re.match(r"^[a-z0-9-]+\.png$", leaf):
+                kind = "image/png"
+            else:
+                self.send_error(404)
+                return
+            target = os.path.join(UI_DIR, leaf)
+            if not os.path.exists(target):
+                self.send_error(404)
+                return
+            self._send(open(target, "rb").read(), kind)
+        elif path in ("/", "/index.html"):
+            self._send(open(os.path.join(HERE, "index.html"), "rb").read(),
+                       "text/html; charset=utf-8")
+        else:
+            self.send_error(404)
+
+    def do_POST(self):
+        path = self.path.split("?")[0]
+        if path == "/api/art":
+            if not self._local_only():
+                return
+            try:
+                length = int(self.headers.get("Content-Length") or 0)
+                body = json.loads(self.rfile.read(length).decode("utf-8")) if length else {}
+            except ValueError:
+                self._json({"error": "expected a JSON object"}, 400)
+                return
+            problem = start_art(body.get("client") if isinstance(body, dict) else None)
+            if problem:
+                self._json({"error": problem}, 400)
+                return
+            self._json(art_status())
+            return
+        if path != "/api/config":
+            self.send_error(404)
+            return
+        if not self._local_only():
+            return
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+            changes = json.loads(self.rfile.read(length).decode("utf-8")) if length else {}
+            if not isinstance(changes, dict) or not changes:
+                self._json({"error": "expected a JSON object of settings"}, 400)
+                return
+            written, backups, errors = botconfig.apply_settings(
+                CONFIG_DIR, changes, CONFIG_BACKUPS)
+            if errors:
+                self._json({"errors": errors}, 400)
+                return
+            running = server_state().get("running", False)
+            self._json({
+                "written": written,
+                "backups": [os.path.basename(b) for b in backups],
+                "serverRunning": running,
+                # Read at startup, so a stopped server needs nothing further.
+                "note": ("The server is running, so settings marked restart will not take "
+                         "effect until it is restarted."
+                         if running else
+                         "The server is stopped, so these take effect the next time it starts."),
+                "settings": botconfig.read_settings(CONFIG_DIR),
+            })
+        except Exception as error:               # noqa: BLE001 - report, never 500 blindly
+            self._json({"error": "%s: %s" % (type(error).__name__, error)}, 500)
 
     def log_message(self, *args):
         pass

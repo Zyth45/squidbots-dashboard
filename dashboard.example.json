@@ -15,6 +15,15 @@
   "dbcDir": "C:\\my-server\\server\\data\\dbc",
   "incidentsLog": "C:\\my-server\\watch.txt",
 
+  "_comment_settings": "The Settings page edits the module .conf files in this folder. By default it looks in the repack's CoA-Bots\\Core\\configs\\modules, then Core\\configs\\modules.",
+  "configDir": "C:\\my-server\\server\\configs\\modules",
+
+  "_comment_client": "Optional: the game client folder the Extract game art button starts from. Without it the dashboard looks beside the repack.",
+  "gameClient": "C:\\Games\\World of Warcraft",
+
+  "_comment_live": "Optional: a bot-status.json that a worldserver module writes every few seconds, for live positions and what each bot is doing. Without it the map uses the last character save.",
+  "botStatusFile": "C:\\my-server\\server\\logs\\bot-status.json",
+
   "_comment_dates": "uptimeSince counts the server hours from that date; countFrom makes every figure start there instead of at the bots' creation.",
   "uptimeSince": "2026-09-01 00:00:00",
 

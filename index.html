@@ -4,1076 +4,199 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SquidBots – Conquest of Azeroth</title>
-<style>
-:root {
-  color-scheme: light;
-  --page: #f6f5f2;
-  --page-glow: rgba(184, 134, 11, 0.10);
-  --surface: #fffffe;
-  --surface-2: #f1efe9;
-  --text-primary: #16150f;
-  --text-secondary: #56534a;
-  --text-muted: #8b877c;
-  --border: rgba(22, 21, 15, 0.12);
-  --hairline: rgba(22, 21, 15, 0.07);
-  --grid: #e4e1d8;
-  --axis: #c4c0b3;
-  --gold: #8a6a1f;
-  --gold-bright: #b8860b;
-  --alliance: #2a78d6;
-  --horde: #c0392b;
-  --accent: #0f8a74;
-  --good: #0f7a2e;
-  --bad: #c0392b;
-  --rare: #1e6fc4;
-  --epic: #7a4bd0;
-  --legendary: #b8620a;
-  --shadow: 0 1px 2px rgba(22, 21, 15, .06), 0 12px 32px rgba(22, 21, 15, .06);
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    color-scheme: dark;
-    --page: #0c0d10;
-    --page-glow: rgba(224, 180, 58, 0.13);
-    --surface: #15161a;
-    --surface-2: #1d1f25;
-    --text-primary: #f6f5f2;
-    --text-secondary: #b9b6ad;
-    --text-muted: #85827a;
-    --border: rgba(255, 255, 255, 0.11);
-    --hairline: rgba(255, 255, 255, 0.06);
-    --grid: #262830;
-    --axis: #373a44;
-    --gold: #e0b43a;
-    --gold-bright: #f0cc6a;
-    --alliance: #3987e5;
-    --horde: #e05a4a;
-    --accent: #1aa390;
-    --good: #35b36a;
-    --bad: #e05a4a;
-    --rare: #4a9eff;
-    --epic: #a97ce8;
-    --legendary: #ff9a3c;
-    --shadow: 0 1px 2px rgba(0, 0, 0, .5), 0 18px 40px rgba(0, 0, 0, .45);
-  }
-}
-:root[data-theme="dark"] {
-  color-scheme: dark;
-  --page: #0c0d10;
-  --page-glow: rgba(224, 180, 58, 0.13);
-  --surface: #15161a;
-  --surface-2: #1d1f25;
-  --text-primary: #f6f5f2;
-  --text-secondary: #b9b6ad;
-  --text-muted: #85827a;
-  --border: rgba(255, 255, 255, 0.11);
-  --hairline: rgba(255, 255, 255, 0.06);
-  --grid: #262830;
-  --axis: #373a44;
-  --gold: #e0b43a;
-  --gold-bright: #f0cc6a;
-  --alliance: #3987e5;
-  --horde: #e05a4a;
-  --accent: #1aa390;
-  --good: #35b36a;
-  --bad: #e05a4a;
-  --rare: #4a9eff;
-  --epic: #a97ce8;
-  --legendary: #ff9a3c;
-  --shadow: 0 1px 2px rgba(0, 0, 0, .5), 0 18px 40px rgba(0, 0, 0, .45);
-}
-
-* { box-sizing: border-box; }
-html { -webkit-text-size-adjust: 100%; }
-body {
-  margin: 0;
-  padding: 0 16px 64px;
-  background:
-    radial-gradient(1100px 520px at 50% -180px, var(--page-glow), transparent 70%),
-    var(--page);
-  color: var(--text-primary);
-  font: 15px/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", Inter, system-ui, sans-serif;
-  -webkit-font-smoothing: antialiased;
-}
-.wrap { max-width: 1180px; margin: 0 auto; }
-.num { font-variant-numeric: tabular-nums; }
-
-/* ---------- header ---------- */
-header { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 36px 4px 26px; }
-.mark { display: flex; align-items: center; gap: 13px; margin-right: auto; }
-.crest {
-  width: 46px; height: 46px; border-radius: 14px; flex: none;
-  display: grid; place-items: center; font-size: 23px;
-  background: linear-gradient(150deg, var(--gold-bright), var(--gold) 65%, rgba(0,0,0,.15));
-  box-shadow: 0 6px 18px rgba(184, 134, 11, .28), inset 0 1px 0 rgba(255,255,255,.35);
-}
-h1 { margin: 0; font-size: 27px; letter-spacing: -.5px; line-height: 1.1; font-weight: 700; }
-h1 span { color: var(--gold); }
-.tagline { margin: 3px 0 0; font-size: 13px; color: var(--text-muted); }
-.pill {
-  display: inline-flex; align-items: center; gap: 8px; padding: 7px 14px; border-radius: 999px;
-  background: var(--surface); border: 1px solid var(--border);
-  font-size: 13px; color: var(--text-secondary); box-shadow: var(--shadow);
-}
-.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--good); flex: none; }
-.dot.off { background: var(--bad); }
-.dot.live { animation: pulse 2.4s ease-in-out infinite; }
-@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
-@media (prefers-reduced-motion: reduce) { .dot.live { animation: none; } }
-button.ghost {
-  font: inherit; font-size: 13px; color: var(--text-secondary); cursor: pointer;
-  padding: 7px 14px; border-radius: 999px;
-  background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow);
-}
-button.ghost:hover { color: var(--text-primary); }
-
-/* ---------- cards ---------- */
-.card {
-  background: var(--surface); border: 1px solid var(--border); border-radius: 18px;
-  box-shadow: var(--shadow); padding: 20px 22px; margin-bottom: 18px;
-}
-.card > h2 {
-  margin: 0 0 4px; font-size: 16px; font-weight: 650; letter-spacing: -.2px;
-  display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
-}
-.card > h2 .sub { font-size: 12px; font-weight: 450; color: var(--text-muted); }
-.grid { display: grid; gap: 18px; }
-@media (min-width: 880px) {
-  .grid.two { grid-template-columns: 1fr 1fr; }
-  .grid.wide { grid-template-columns: 1.35fr 1fr; }
-}
-
-/* ---------- hero figures ---------- */
-.figures {
-  display: grid; grid-template-columns: repeat(2, 1fr); gap: 1px; background: var(--hairline);
-  border: 1px solid var(--border); border-radius: 18px; overflow: hidden; box-shadow: var(--shadow); margin-bottom: 18px;
-}
-@media (min-width: 700px) { .figures { grid-template-columns: repeat(3, 1fr); } }
-@media (min-width: 1000px) { .figures { grid-template-columns: repeat(6, 1fr); } }
-.figure { background: var(--surface); padding: 18px 18px 16px; }
-.figure .label { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .06em; }
-.figure .value { font-size: 30px; font-weight: 680; letter-spacing: -1px; margin-top: 6px; line-height: 1; }
-.figure .foot { font-size: 12px; color: var(--text-secondary); margin-top: 7px; min-height: 18px; }
-
-/* ---------- splits ---------- */
-.splits { display: flex; flex-direction: column; gap: 12px; margin-top: 14px; }
-.split { display: flex; height: 16px; border-radius: 999px; overflow: hidden; background: var(--surface-2); gap: 2px; }
-.split i { display: block; height: 100%; }
-.legend { display: flex; flex-wrap: wrap; gap: 18px; font-size: 13px; color: var(--text-secondary); }
-.legend b { color: var(--text-primary); font-weight: 620; }
-.key { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 7px; vertical-align: -1px; }
-
-/* ---------- tables ---------- */
-table { width: 100%; border-collapse: collapse; font-size: 14px; }
-th { text-align: left; font-weight: 550; font-size: 12px; color: var(--text-muted);
-  text-transform: uppercase; letter-spacing: .05em; padding: 10px 8px; border-bottom: 1px solid var(--border); }
-td { padding: 9px 8px; border-bottom: 1px solid var(--hairline); vertical-align: middle; }
-tbody tr:last-child td { border-bottom: 0; }
-td.r, th.r { text-align: right; font-variant-numeric: tabular-nums; }
-.rank { color: var(--text-muted); width: 28px; font-variant-numeric: tabular-nums; }
-.name { font-weight: 560; }
-.meta { color: var(--text-muted); font-size: 12px; }
-.faction-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 7px; vertical-align: 1px; }
-.bar { position: relative; height: 8px; border-radius: 999px; background: var(--surface-2); overflow: hidden; min-width: 56px; }
-.bar i { position: absolute; inset: 0 auto 0 0; border-radius: 999px; background: var(--gold); }
-.offline { opacity: .55; }
-.empty { color: var(--text-muted); font-size: 13px; padding: 14px 2px; margin: 0; }
-.scroll { overflow-x: auto; }
-.q3 { color: var(--rare); font-weight: 560; }
-.q4 { color: var(--epic); font-weight: 560; }
-.q5 { color: var(--legendary); font-weight: 560; }
-
-/* ---------- watch ---------- */
-.watch { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--hairline);
-  border: 1px solid var(--border); border-radius: 14px; overflow: hidden; margin: 14px 0 4px; }
-.watch div { background: var(--surface); padding: 12px 14px; }
-.watch .n { font-size: 22px; font-weight: 660; letter-spacing: -.5px; font-variant-numeric: tabular-nums; }
-.watch .n.alert { color: var(--bad); }
-.watch .k { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .06em; }
-.events { list-style: none; margin: 12px 0 0; padding: 0; font-size: 13px; }
-.events li { display: flex; gap: 10px; padding: 7px 0; border-top: 1px solid var(--hairline); color: var(--text-secondary); }
-.events li time { color: var(--text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.levels { display: flex; align-items: flex-end; gap: 6px; height: 150px; margin-top: 16px; }
-.levels div { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 6px; height: 100%; }
-.levels i { display: block; width: 100%; border-radius: 6px 6px 2px 2px; background: var(--gold); min-height: 2px; }
-.levels span { font-size: 11px; color: var(--text-muted); }
-.levels b { font-size: 12px; font-variant-numeric: tabular-nums; font-weight: 600; }
-
-/* ---------- search and bot sheet ---------- */
-.search { position: relative; margin-left: auto; }
-.search input {
-  font: inherit; font-size: 13px; width: 190px; padding: 7px 14px; border-radius: 999px;
-  background: var(--surface); border: 1px solid var(--border); color: var(--text-primary); box-shadow: var(--shadow);
-}
-.search input::placeholder { color: var(--text-muted); }
-.results { position: absolute; top: 42px; right: 0; width: 280px; max-height: 340px; overflow-y: auto; z-index: 20;
-  background: var(--surface); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow); padding: 6px; }
-.results button { display: block; width: 100%; text-align: left; font: inherit; font-size: 13px; cursor: pointer;
-  background: transparent; border: 0; border-radius: 9px; padding: 8px 10px; color: var(--text-primary); }
-.results button:hover { background: var(--surface-2); }
-dialog {
-  border: 1px solid var(--border); border-radius: 18px; background: var(--surface); color: var(--text-primary);
-  box-shadow: var(--shadow); padding: 0; max-width: 440px; width: calc(100% - 32px);
-}
-dialog::backdrop { background: rgba(0, 0, 0, .55); backdrop-filter: blur(3px); }
-.sheet { padding: 22px 24px 20px; }
-.sheet h3 { margin: 0; font-size: 20px; letter-spacing: -.3px; }
-.sheet .who { color: var(--text-muted); font-size: 13px; margin: 4px 0 16px; }
-.sheet dl { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 18px; margin: 0; }
-.sheet dt { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .06em; }
-.sheet dd { margin: 2px 0 0; font-size: 17px; font-weight: 620; font-variant-numeric: tabular-nums; }
-.sheet .close { margin-top: 18px; }
-.clickable { cursor: pointer; text-decoration: underline; text-decoration-color: var(--border); text-underline-offset: 3px; }
-.clickable:hover { text-decoration-color: var(--gold); }
-
-/* ---------- tabs ---------- */
-.tabs { display: flex; gap: 4px; padding: 4px; background: var(--surface-2); border-radius: 12px; margin: 12px 0 4px; width: fit-content; }
-.tabs button { font: inherit; font-size: 13px; padding: 6px 14px; border-radius: 9px; border: 0; cursor: pointer;
-  background: transparent; color: var(--text-secondary); }
-.tabs button[aria-selected="true"] { background: var(--surface); color: var(--text-primary); box-shadow: var(--shadow); font-weight: 560; }
-
-/* ---------- chart ---------- */
-.chart { position: relative; margin-top: 10px; }
-.chart svg { width: 100%; height: auto; display: block; }
-.tip { position: absolute; pointer-events: none; opacity: 0; transition: opacity .12s;
-  background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow);
-  padding: 8px 11px; font-size: 12px; color: var(--text-secondary); white-space: nowrap; z-index: 5; }
-.tip b { display: block; color: var(--text-primary); font-size: 13px; font-variant-numeric: tabular-nums; }
-footer { color: var(--text-muted); font-size: 12px; text-align: center; padding: 8px 0 0; }
-footer a { color: var(--gold); }
-</style>
+<link rel="stylesheet" href="static/dashboard.css">
 </head>
 <body>
-<div class="wrap">
+<div class="app">
 
-<header>
-  <div class="mark">
-    <div class="crest">🦑</div>
-    <div>
-      <h1>Squid<span>Bots</span></h1>
-      <p class="tagline" data-i18n="tagline"></p>
+<nav class="side" aria-label="Pages">
+  <a class="brand" href="#world">
+    <span class="crest" aria-hidden="true">🦑</span>
+    <span class="brand-words">
+      <span class="brand-name">Squid<b>Bots</b></span>
+      <span class="tagline" data-i18n="tagline"></span>
+    </span>
+  </a>
+  <a class="nav-link" href="#world"><i class="ico" data-icon="world" aria-hidden="true"></i><span data-i18n="navWorld"></span></a>
+  <a class="nav-link" href="#bots"><i class="ico" data-icon="bots" aria-hidden="true"></i><span data-i18n="navBots"></span></a>
+  <a class="nav-link" href="#stats"><i class="ico" data-icon="stats" aria-hidden="true"></i><span data-i18n="navStats"></span></a>
+  <a class="nav-link" href="#chat"><i class="ico" data-icon="chat" aria-hidden="true"></i><span data-i18n="navChat"></span></a>
+  <a class="nav-link" href="#settings"><i class="ico" data-icon="settings" aria-hidden="true"></i><span data-i18n="navSettings"></span></a>
+</nav>
+
+<div class="content">
+  <header class="topbar">
+    <h1 id="pageTitle"></h1>
+    <div class="search">
+      <input id="search" type="search" autocomplete="off" data-i18n-placeholder="searchBot" data-i18n-aria="searchBot">
+      <div class="results" id="results" hidden></div>
     </div>
-  </div>
-  <div class="search">
-    <input id="search" type="search" autocomplete="off" data-i18n-placeholder="searchBot" data-i18n-aria="searchBot">
-    <div class="results" id="results" hidden></div>
-  </div>
-  <span class="pill"><span class="dot live" id="stateDot"></span><span id="stateText"></span></span>
-  <span class="pill" id="updatedPill">—</span>
-  <button class="ghost" id="langButton" type="button">FR</button>
-  <button class="ghost" id="themeButton" type="button" data-i18n="theme"></button>
-</header>
+    <span class="pill"><span class="dot live" id="stateDot"></span><span id="stateText"></span></span>
+    <span class="pill quiet" id="updatedPill">-</span>
+    <button class="btn small" id="langButton" type="button">FR</button>
+  </header>
 
-<div class="figures" id="figures"></div>
+  <div class="banner" id="offlineBanner" hidden></div>
 
-<div class="grid wide">
-  <section class="card">
-    <h2><span data-i18n="paceTitle"></span> <span class="sub" id="paceSub"></span></h2>
-    <div class="chart" id="paceChart"></div>
-  </section>
-  <section class="card">
-    <h2><span data-i18n="factionsTitle"></span> <span class="sub" data-i18n="factionsSub"></span></h2>
-    <div class="splits" id="factions"></div>
-    <h2 style="margin-top:22px"><span data-i18n="rolesTitle"></span> <span class="sub" data-i18n="rolesSub"></span></h2>
-    <div class="splits" id="roles"></div>
-  </section>
-</div>
-
-<div class="grid two">
-  <section class="card">
-    <h2><span data-i18n="zonesTitle"></span> <span class="sub" data-i18n="zonesSub"></span></h2>
-    <div id="zones"></div>
-  </section>
-  <section class="card">
-    <h2><span data-i18n="compareTitle"></span> <span class="sub" data-i18n="compareSub"></span></h2>
-    <div id="compare"></div>
-    <h2 style="margin-top:22px"><span data-i18n="deadTitle"></span> <span class="sub" data-i18n="deadSub"></span></h2>
-    <div class="chart" id="deadChart"></div>
-  </section>
-</div>
-
-<div class="grid two">
-  <section class="card">
-    <h2><span data-i18n="progressTitle"></span> <span class="sub" id="progressSub"></span></h2>
-    <div class="chart" id="levelsChart"></div>
-  </section>
-  <section class="card">
-    <h2><span data-i18n="levelsTitle"></span> <span class="sub" data-i18n="levelsSub"></span></h2>
-    <div class="levels" id="levelBars"></div>
-  </section>
-</div>
-
-<div class="grid two">
-  <section class="card">
-    <h2><span data-i18n="xpTitle"></span> <span class="sub" id="xpSub"></span></h2>
-    <div id="xpRate"></div>
-  </section>
-  <section class="card">
-    <h2><span data-i18n="spellsTitle"></span> <span class="sub" id="actionsSub"></span></h2>
-    <div id="actions"></div>
-  </section>
-</div>
-
-<div class="grid two">
-  <section class="card">
-    <h2><span data-i18n="watchTitle"></span> <span class="sub" data-i18n="watchSub"></span></h2>
-    <div class="watch" id="watch"></div>
-    <div id="stuckNames"></div>
-    <ul class="events" id="incidents"></ul>
-  </section>
-  <section class="card">
-    <h2><span data-i18n="topTitle"></span> <span class="sub" data-i18n="topSub"></span></h2>
-    <div class="tabs" role="tablist" id="topTabs">
-      <button role="tab" data-key="xp" aria-selected="true" data-i18n="tabXp"></button>
-      <button role="tab" data-key="kills" aria-selected="false" data-i18n="tabKills"></button>
-      <button role="tab" data-key="quests" aria-selected="false" data-i18n="tabQuests"></button>
+  <main class="page" data-page="world">
+    <div class="figures" id="figures"></div>
+    <div class="world-layout">
+      <section class="card">
+        <h2><span data-i18n="mapTitle"></span> <span class="sub" id="mapSub"></span></h2>
+        <div class="tabs" role="tablist" id="mapTabs"></div>
+        <div class="art-prompt" id="artPrompt" hidden></div>
+        <div class="map-layout">
+          <div id="mapHolder"></div>
+          <div id="mapZones"></div>
+        </div>
+        <div id="mapElsewhere"></div>
+      </section>
+      <section class="card focus" id="focusPanel">
+        <h2><span data-i18n="focusTitle"></span> <span class="sub" data-focus-name></span></h2>
+        <div data-focus-card><p class="empty" data-i18n="focusNone"></p></div>
+      </section>
     </div>
-    <div id="top"></div>
-  </section>
-</div>
+  </main>
 
-<div class="grid wide">
-  <section class="card">
-    <h2><span data-i18n="chatTitle"></span> <span class="sub" id="chatSub"></span></h2>
-    <div id="chat"></div>
-  </section>
-  <section class="card">
-    <h2><span data-i18n="lootTitle"></span> <span class="sub" id="lootSub"></span></h2>
-    <div id="loot"></div>
-  </section>
-</div>
+  <main class="page" data-page="bots" hidden>
+    <div class="bots-layout">
+    <section class="card">
+      <h2><span data-i18n="rosterTitle"></span> <span class="sub" id="rosterSub"></span></h2>
+      <div class="toolbar">
+        <input id="rosterFilter" type="search" autocomplete="off" data-i18n-placeholder="rosterFilter" data-i18n-aria="rosterFilter">
+        <div class="tabs" role="tablist" id="rosterSort">
+          <button role="tab" data-key="level" aria-selected="true" data-i18n="sortLevel"></button>
+          <button role="tab" data-key="name" aria-selected="false" data-i18n="sortName"></button>
+          <button role="tab" data-key="zone" aria-selected="false" data-i18n="sortZone"></button>
+        </div>
+      </div>
+      <div class="scroll" id="roster"></div>
+    </section>
+    <section class="card focus">
+      <h2><span data-i18n="focusTitle"></span> <span class="sub" data-focus-name></span></h2>
+      <div data-focus-card><p class="empty" data-i18n="focusNone"></p></div>
+    </section>
+    </div>
+  </main>
 
-<section class="card">
-  <h2><span data-i18n="classesTitle"></span> <span class="sub" data-i18n="classesSub"></span></h2>
-  <div class="scroll" id="classes"></div>
-</section>
+  <main class="page" data-page="stats" hidden>
+    <div class="grid wide">
+      <section class="card">
+        <h2><span data-i18n="paceTitle"></span> <span class="sub" id="paceSub"></span></h2>
+        <div class="chart" id="paceChart"></div>
+      </section>
+      <section class="card">
+        <h2><span data-i18n="factionsTitle"></span> <span class="sub" data-i18n="factionsSub"></span></h2>
+        <div class="splits" id="factions"></div>
+        <h2 class="later"><span data-i18n="rolesTitle"></span> <span class="sub" data-i18n="rolesSub"></span></h2>
+        <div class="splits" id="roles"></div>
+      </section>
+    </div>
+    <div class="grid two">
+      <section class="card">
+        <h2><span data-i18n="zonesTitle"></span> <span class="sub" data-i18n="zonesSub"></span></h2>
+        <div id="zones"></div>
+      </section>
+      <section class="card">
+        <h2><span data-i18n="compareTitle"></span> <span class="sub" data-i18n="compareSub"></span></h2>
+        <div id="compare"></div>
+        <h2 class="later"><span data-i18n="deadTitle"></span> <span class="sub" data-i18n="deadSub"></span></h2>
+        <div class="chart" id="deadChart"></div>
+      </section>
+    </div>
+    <div class="grid two">
+      <section class="card">
+        <h2><span data-i18n="progressTitle"></span> <span class="sub" id="progressSub"></span></h2>
+        <div class="chart" id="levelsChart"></div>
+      </section>
+      <section class="card">
+        <h2><span data-i18n="levelsTitle"></span> <span class="sub" data-i18n="levelsSub"></span></h2>
+        <div class="levels" id="levelBars"></div>
+      </section>
+    </div>
+    <div class="grid two">
+      <section class="card">
+        <h2><span data-i18n="xpTitle"></span> <span class="sub" id="xpSub"></span></h2>
+        <div id="xpRate"></div>
+      </section>
+      <section class="card">
+        <h2><span data-i18n="spellsTitle"></span> <span class="sub" id="actionsSub"></span></h2>
+        <div id="actions"></div>
+      </section>
+    </div>
+    <div class="grid two">
+      <section class="card">
+        <h2><span data-i18n="watchTitle"></span> <span class="sub" data-i18n="watchSub"></span></h2>
+        <div class="watch" id="watch"></div>
+        <div id="stuckNames"></div>
+        <ul class="events" id="incidents"></ul>
+      </section>
+      <section class="card">
+        <h2><span data-i18n="topTitle"></span> <span class="sub" data-i18n="topSub"></span></h2>
+        <div class="tabs" role="tablist" id="topTabs">
+          <button role="tab" data-key="xp" aria-selected="true" data-i18n="tabXp"></button>
+          <button role="tab" data-key="kills" aria-selected="false" data-i18n="tabKills"></button>
+          <button role="tab" data-key="quests" aria-selected="false" data-i18n="tabQuests"></button>
+        </div>
+        <div id="top"></div>
+      </section>
+    </div>
+    <section class="card">
+      <h2><span data-i18n="classesTitle"></span> <span class="sub" data-i18n="classesSub"></span></h2>
+      <div class="scroll" id="classes"></div>
+    </section>
+  </main>
+
+  <main class="page" data-page="chat" hidden>
+    <section class="card" id="feedCard">
+      <h2><span data-i18n="feedTitle"></span> <span class="sub" id="feedSub"></span></h2>
+      <div class="toolbar">
+        <div class="tabs" role="tablist" id="feedKinds">
+          <button role="tab" data-kind="" aria-selected="true" data-i18n="feedAll"></button>
+          <button role="tab" data-kind="say,yell" aria-selected="false" data-i18n="feedSay"></button>
+          <button role="tab" data-kind="whisper" aria-selected="false" data-i18n="feedWhisper"></button>
+          <button role="tab" data-kind="channel,party,guild" aria-selected="false" data-i18n="feedChannels"></button>
+        </div>
+        <input id="feedSearch" type="search" autocomplete="off" data-i18n-placeholder="feedSearch" data-i18n-aria="feedSearch">
+      </div>
+      <div class="feed" id="feed"></div>
+    </section>
+    <div class="grid wide">
+      <section class="card">
+        <h2><span data-i18n="chatTitle"></span> <span class="sub" id="chatSub"></span></h2>
+        <div id="chat"></div>
+      </section>
+      <section class="card">
+        <h2><span data-i18n="lootTitle"></span> <span class="sub" id="lootSub"></span></h2>
+        <div id="loot"></div>
+      </section>
+    </div>
+  </main>
+
+  <main class="page" data-page="settings" hidden>
+    <section class="card">
+      <h2><span data-i18n="settingsTitle"></span> <span class="sub" id="settingsSub"></span></h2>
+      <div id="settingsNotes"></div>
+      <div id="recipes"></div>
+      <div id="settings"></div>
+      <div class="settings-actions">
+        <button class="btn" type="button" id="settingsReload" data-i18n="reload"></button>
+        <button class="btn primary" type="button" id="settingsApply" disabled data-i18n="applyChanges"></button>
+        <span id="settingsStatus"></span>
+      </div>
+    </section>
+    <section class="card" id="artCard">
+      <h2>Game art <span class="sub" id="artSub"></span></h2>
+      <div id="artPanel"></div>
+    </section>
+  </main>
+
+  <footer id="footer"></footer>
+</div>
+</div>
 
 <dialog id="sheet"><div class="sheet" id="sheetBody"></div></dialog>
 
-<footer id="footer"></footer>
-</div>
-
-<script>
-const API = "/api/stats";
-const PUBLIC = false;
-
-/* ---------------- words ---------------- */
-const WORDS = {
-  en: {
-    locale: "en-GB",
-    tagline: "Conquest of Azeroth · bots, live",
-    theme: "Theme", searchBot: "Search a bot", otherLang: "FR",
-    online: n => n + " bots online", stopped: "server stopped", unreachable: "page unreachable",
-    updated: at => "updated at " + at,
-    figBots: "Bots online", figBotsFoot: n => "of " + n + " characters",
-    figLevel: "Average level", figLevelFoot: n => "best: " + n,
-    figKills: "Mobs killed", figKillsFoot: n => n + " per hour",
-    figQuests: "Quests handed in", figQuestsFoot: since => "since " + since,
-    figLevels: "Levels gained", figLevelsFoot: h => "since the server started, " + h + " h ago",
-    figServer: "Server", figServerRunning: "running", figServerMemory: n => n + " MB of memory",
-    paceTitle: "Hunting pace", paceSub: "mobs killed per hour",
-    factionsTitle: "Factions online", factionsSub: "right now", levelWord: n => "level " + n,
-    rolesTitle: "Roles", rolesSub: "bots online now",
-    tanks: "Tanks", healers: "Healers", damage: "Damage",
-    zonesTitle: "Where the bots are", zonesSub: "busiest zones, online",
-    compareTitle: "Today and yesterday", compareSub: "24 hours against the 24 before",
-    compareDay: "24 h", compareBefore: "Before", compareChange: "Change",
-    compareWait: "One full day of readings is needed.",
-    deadTitle: "Bots on the floor", deadSub: "read every ten minutes",
-    watchTitle: "Watch post", watchSub: "what deserves a look",
-    watchDead: "Dead right now", watchStuck: "Stuck bots", watchCrashes: "Crashes 24 h",
-    watchNoJournal: "Watch journal not configured.", watchQuiet: "No incident: no crash, no freeze.",
-    stuckLine: (h, names) => "Not a single point of experience in " + h + " h: " + names,
-    levelsTitle: "Level spread", levelsSub: "bots online now",
-    xpTitle: "Best experience gains", xpSpan: h => "over the last " + h + " hours", xpMeasuring: "measuring",
-    xpWait: "First reading under way: the ranking starts after an hour of play.",
-    xpUnit: "xp/h", levelShort: n => "level " + n,
-    chatTitle: "Most talkative", chatNone: "The chat journal starts at the next server restart.",
-    chatSub: (m, t) => m + " messages · " + t + " talkers",
-    chatChannel: n => n + " in a channel", chatOther: "conversations and emotes", chatUnit: "msg",
-    classesTitle: "Class ranking", classesSub: "average level, and each class's podium",
-    colClass: "Class", colAvgLevel: "Average level", colBots: "Bots", colKills: "Mobs", colPodium: "Podium",
-    showAll: n => "Show all " + n + " classes", showFew: "Show only the first eight",
-    progressTitle: "Progress", progressSub: "levels gained per hour",
-    topTitle: "Leaderboard", topSub: "the first ten bots",
-    tabXp: "Experience", tabKills: "Mobs", tabQuests: "Quests",
-    unitLevel: "lvl", unitKills: "killed", unitQuests: "quests", offline: "offline",
-    spellsTitle: "Spells cast", spellsSub: h => "over " + h + " h · cast / tried",
-    spellsNone: "No spell journal.",
-    colAction: "Action", colSuccess: "Success", colCast: "Cast", colTried: "Tried",
-    lootTitle: "Notable finds", lootSub: n => n + " in the last two days",
-    lootNone: "No loot journal yet: it starts at the next server restart.",
-    lootQuiet: "Nothing notable in the last two days.",
-    sheetLevel: "Level", sheetKills: "Mobs killed", sheetQuests: "Quests", sheetPlayed: "Time played",
-    sheetXp: "Experience", sheetZone: "Zone", close: "Close",
-    tank: "tank", heal: "healer", dps: "damage",
-    footer: "Private Conquest of Azeroth server · this page refreshes itself · ",
-    footerLink: "the bot module",
-    chartWait: "The curve starts about 30 minutes after the server: bots are saved every quarter of an hour.",
-    noData: "No data.", measuring: "Measuring…",
-    spellNames: {
-      attack: "Attack", aoe: "Area spells", heal: "Heal", "group heal": "Group heal", hot: "Heal over time",
-      taunt: "Taunt", defensive: "Defensive", dispel: "Dispel", interrupt: "Interrupt", buff: "Buff",
-    },
-  },
-  fr: {
-    locale: "fr-FR",
-    tagline: "Conquest of Azeroth · bots en direct",
-    theme: "Thème", searchBot: "Chercher un bot", otherLang: "EN",
-    online: n => n + " bots en ligne", stopped: "serveur arrêté", unreachable: "page injoignable",
-    updated: at => "mis à jour à " + at,
-    figBots: "Bots en ligne", figBotsFoot: n => "sur " + n + " personnages",
-    figLevel: "Niveau moyen", figLevelFoot: n => "meilleur : " + n,
-    figKills: "Monstres tués", figKillsFoot: n => n + " par heure",
-    figQuests: "Quêtes rendues", figQuestsFoot: since => "depuis le " + since,
-    figLevels: "Niveaux gagnés", figLevelsFoot: h => "depuis le démarrage, il y a " + h + " h",
-    figServer: "Serveur", figServerRunning: "en fonctionnement", figServerMemory: n => n + " Mo de mémoire",
-    paceTitle: "Rythme de chasse", paceSub: "monstres tués par heure",
-    factionsTitle: "Factions en ligne", factionsSub: "à cet instant", levelWord: n => "niveau " + n,
-    rolesTitle: "Rôles", rolesSub: "bots connectés",
-    tanks: "Tanks", healers: "Soigneurs", damage: "Dégâts",
-    zonesTitle: "Où sont les bots", zonesSub: "zones les plus peuplées, en ligne",
-    compareTitle: "Hier et aujourd'hui", compareSub: "24 heures contre les 24 précédentes",
-    compareDay: "24 h", compareBefore: "Veille", compareChange: "Écart",
-    compareWait: "Il faut une journée de relevés.",
-    deadTitle: "Bots au sol", deadSub: "relevé toutes les dix minutes",
-    watchTitle: "Poste de garde", watchSub: "ce qui mérite un coup d'œil",
-    watchDead: "Morts à cet instant", watchStuck: "Bots bloqués", watchCrashes: "Plantages 24 h",
-    watchNoJournal: "Journal de surveillance non configuré.",
-    watchQuiet: "Aucun incident : ni plantage, ni blocage.",
-    stuckLine: (h, names) => "Pas un point d'expérience depuis " + h + " h : " + names,
-    levelsTitle: "Répartition des niveaux", levelsSub: "bots connectés",
-    xpTitle: "Meilleurs gains d'expérience", xpSpan: h => "sur les " + h + " dernières heures",
-    xpMeasuring: "mesure en cours",
-    xpWait: "Première mesure en cours : le classement démarre après une heure de jeu.",
-    xpUnit: "xp/h", levelShort: n => "niveau " + n,
-    chatTitle: "Les plus bavards", chatNone: "Le journal du chat commence au prochain démarrage du serveur.",
-    chatSub: (m, t) => m + " messages · " + t + " bavards",
-    chatChannel: n => n + " dans un canal", chatOther: "conversations et émotes", chatUnit: "msg",
-    classesTitle: "Classement par classe", classesSub: "niveau moyen, et le podium de chaque classe",
-    colClass: "Classe", colAvgLevel: "Niveau moyen", colBots: "Bots", colKills: "Monstres", colPodium: "Podium",
-    showAll: n => "Voir les " + n + " classes", showFew: "Ne montrer que les huit premières",
-    progressTitle: "Progression", progressSub: "niveaux gagnés par heure",
-    topTitle: "Palmarès", topSub: "les dix premiers bots",
-    tabXp: "Expérience", tabKills: "Monstres", tabQuests: "Quêtes",
-    unitLevel: "niv.", unitKills: "tués", unitQuests: "quêtes", offline: "hors ligne",
-    spellsTitle: "Sorts lancés", spellsSub: h => "sur " + h + " h · lancés / tentés",
-    spellsNone: "Pas de journal des sorts.",
-    colAction: "Action", colSuccess: "Réussite", colCast: "Lancés", colTried: "Tentés",
-    lootTitle: "Butin remarquable", lootSub: n => n + " sur les deux derniers jours",
-    lootNone: "Pas encore de journal du butin : il commence au prochain démarrage du serveur.",
-    lootQuiet: "Rien de remarquable sur les deux derniers jours.",
-    sheetLevel: "Niveau", sheetKills: "Monstres tués", sheetQuests: "Quêtes", sheetPlayed: "Temps de jeu",
-    sheetXp: "Expérience", sheetZone: "Zone", close: "Fermer",
-    tank: "tank", heal: "soigneur", dps: "dégâts",
-    footer: "Serveur privé Conquest of Azeroth · page mise à jour toute seule · ",
-    footerLink: "module des bots",
-    chartWait: "La courbe démarre environ 30 minutes après le serveur : les bots sont sauvegardés tous les quarts d’heure.",
-    noData: "Pas de données.", measuring: "En cours de mesure…",
-    spellNames: {
-      attack: "Attaque", aoe: "Sorts de zone", heal: "Soin", "group heal": "Soin de groupe",
-      hot: "Soin sur la durée", taunt: "Provocation", defensive: "Défensif", dispel: "Dissipation",
-      interrupt: "Interruption", buff: "Amélioration",
-    },
-  },
-};
-
-let lang = "en";
-try {
-  const stored = localStorage.getItem("squidbots-lang");
-  if (stored === "fr" || stored === "en") lang = stored;
-} catch (error) { /* private window: English it is */ }
-let W = WORDS[lang];
-
-const NS = "http://www.w3.org/2000/svg";
-let nf = new Intl.NumberFormat(W.locale);
-const num = n => nf.format(Math.round(n || 0));
-const one = n => nf.format(Math.round((n || 0) * 10) / 10);
-const esc = s => String(s === null || s === undefined ? "" : s)
-  .replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-const el = (tag, attrs, html) => {
-  const node = document.createElement(tag);
-  for (const [k, v] of Object.entries(attrs || {})) node.setAttribute(k, v);
-  if (html) node.innerHTML = html;
-  return node;
-};
-const factionDot = f => '<span class="faction-dot" style="background:var(--' +
-  (f === "alliance" ? "alliance" : "horde") + ')"></span>';
-const medals = ["🥇", "🥈", "🥉"];
-const clock = ts => new Date(ts * 1000).toLocaleTimeString(W.locale, { hour: "2-digit", minute: "2-digit" });
-const when = ts => new Date(ts * 1000).toLocaleString(W.locale, { weekday: "short", hour: "2-digit", minute: "2-digit" });
-
-function applyWords() {
-  document.documentElement.lang = lang;
-  W = WORDS[lang];
-  nf = new Intl.NumberFormat(W.locale);
-  for (const node of document.querySelectorAll("[data-i18n]")) node.textContent = W[node.dataset.i18n];
-  for (const node of document.querySelectorAll("[data-i18n-placeholder]")) {
-    node.placeholder = W[node.dataset.i18nPlaceholder];
-  }
-  for (const node of document.querySelectorAll("[data-i18n-aria]")) {
-    node.setAttribute("aria-label", W[node.dataset.i18nAria]);
-  }
-  document.getElementById("langButton").textContent = W.otherLang;
-  renderFooter();
-}
-
-// The page's own line, unless dashboard.json gives one of its own; "" there means no footer.
-let FOOTER = null;
-function renderFooter() {
-  document.getElementById("footer").innerHTML = typeof FOOTER === "string"
-    ? esc(FOOTER)
-    : esc(W.footer) + '<a href="https://github.com/Zyth45/mod-playerbots/tree/coa">' + esc(W.footerLink) + "</a>";
-}
-
-/* ---------------- theme and language ---------------- */
-try {
-  const stored = localStorage.getItem("squidbots-theme");
-  if (stored) document.documentElement.dataset.theme = stored;
-} catch (error) { /* keep the system theme */ }
-document.getElementById("themeButton").addEventListener("click", () => {
-  const dark = matchMedia("(prefers-color-scheme: dark)").matches;
-  const current = document.documentElement.dataset.theme || (dark ? "dark" : "light");
-  const next = current === "dark" ? "light" : "dark";
-  document.documentElement.dataset.theme = next;
-  try { localStorage.setItem("squidbots-theme", next); } catch (error) { /* ignore */ }
-});
-document.getElementById("langButton").addEventListener("click", () => {
-  lang = lang === "en" ? "fr" : "en";
-  try { localStorage.setItem("squidbots-lang", lang); } catch (error) { /* ignore */ }
-  applyWords();
-  if (LAST) render(LAST);
-});
-
-/* ---------------- line chart ---------------- */
-function lineChart(host, points, options) {
-  const settings = Object.assign({ unit: "", color: "var(--gold)" }, options);
-  const value = settings.value, color = settings.color, unit = settings.unit;
-  host.innerHTML = "";
-  if (!points || points.length < 2) { host.append(el("p", { class: "empty" }, W.chartWait)); return; }
-  const width = 720, height = 240, left = 56, right = 12, top = 14, bottom = 28;
-  const xs = points.map(p => p.ts), ys = points.map(value);
-  const x0 = Math.min.apply(null, xs), x1 = Math.max.apply(null, xs);
-  // Round the top of the scale: readers compare against 40 000, not against 43 972.
-  const rough = Math.max(Math.max.apply(null, ys), 1) * 1.12 / 4;
-  const power = Math.pow(10, Math.floor(Math.log10(rough)));
-  const step = power * [1, 1.5, 2, 2.5, 3, 4, 5, 10].find(m => power * m >= rough);
-  const yMax = step * 4;
-  const px = t => left + (width - left - right) * (x1 === x0 ? 0.5 : (t - x0) / (x1 - x0));
-  const py = v => height - bottom - (height - top - bottom) * (v / yMax);
-
-  const svg = document.createElementNS(NS, "svg");
-  svg.setAttribute("viewBox", "0 0 " + width + " " + height);
-  svg.setAttribute("role", "img");
-  svg.setAttribute("aria-label", settings.label);
-  const add = (tag, attrs) => {
-    const node = document.createElementNS(NS, tag);
-    for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
-    svg.append(node);
-    return node;
-  };
-  const text = (x, y, anchor, content) => {
-    add("text", { x: x, y: y, "text-anchor": anchor, fill: "var(--text-muted)", "font-size": 11 }).textContent = content;
-  };
-
-  for (let i = 0; i <= 4; i++) {
-    const v = yMax * i / 4, y = py(v);
-    add("line", { x1: left, x2: width - right, y1: y, y2: y, stroke: "var(--grid)", "stroke-width": 1 });
-    text(left - 10, y + 4, "end", num(v));
-  }
-  text(left, height - 8, "start", clock(x0));
-  text(width - right, height - 8, "end", clock(x1));
-
-  const path = points.map((p, i) => (i ? "L" : "M") + px(p.ts).toFixed(1) + "," + py(value(p)).toFixed(1)).join(" ");
-  const id = "fill" + Math.random().toString(36).slice(2);
-  const defs = document.createElementNS(NS, "defs");
-  defs.innerHTML = '<linearGradient id="' + id + '" x1="0" y1="0" x2="0" y2="1">' +
-    '<stop offset="0" stop-color="' + color + '" stop-opacity=".26"/>' +
-    '<stop offset="1" stop-color="' + color + '" stop-opacity="0"/></linearGradient>';
-  svg.append(defs);
-  add("path", { d: path + " L" + px(x1).toFixed(1) + "," + py(0) + " L" + px(x0).toFixed(1) + "," + py(0) + " Z",
-    fill: "url(#" + id + ")" });
-  add("path", { d: path, fill: "none", stroke: color, "stroke-width": 2,
-    "stroke-linejoin": "round", "stroke-linecap": "round" });
-
-  const cross = add("line", { x1: 0, x2: 0, y1: top, y2: height - bottom,
-    stroke: "var(--axis)", "stroke-width": 1, opacity: 0 });
-  const dot = add("circle", { r: 4.5, fill: color, stroke: "var(--surface)", "stroke-width": 2, opacity: 0 });
-  host.append(svg);
-  const tip = el("div", { class: "tip" });
-  host.append(tip);
-
-  svg.addEventListener("pointerleave", () => {
-    tip.style.opacity = 0; cross.setAttribute("opacity", 0); dot.setAttribute("opacity", 0);
-  });
-  svg.addEventListener("pointermove", event => {
-    const box = svg.getBoundingClientRect();
-    const wanted = (event.clientX - box.left) / box.width * width;
-    let best = points[0], bestGap = Infinity;
-    for (const p of points) {
-      const gap = Math.abs(px(p.ts) - wanted);
-      if (gap < bestGap) { best = p; bestGap = gap; }
-    }
-    const bx = px(best.ts), by = py(value(best));
-    cross.setAttribute("x1", bx); cross.setAttribute("x2", bx); cross.setAttribute("opacity", .55);
-    dot.setAttribute("cx", bx); dot.setAttribute("cy", by); dot.setAttribute("opacity", 1);
-    tip.innerHTML = "<b>" + num(value(best)) + " " + esc(unit) + "</b>" + when(best.ts);
-    tip.style.opacity = 1;
-    tip.style.left = Math.min(Math.max(bx / width * box.width - tip.offsetWidth / 2, 0),
-      box.width - tip.offsetWidth) + "px";
-    tip.style.top = Math.max(0, by / height * box.height - tip.offsetHeight - 12) + "px";
-  });
-}
-
-/* Gain per hour, measured over at least `window` hours.
-   The server saves its characters every quarter of an hour, so two close points read as a spike
-   followed by a flat line; a wider window gives the rate the bots actually hold. */
-function rates(history, key, window) {
-  const span = window || 0.5;
-  const points = (history || []).filter(p => p[key] !== undefined), out = [];
-  let start = 0;
-  for (let i = 1; i < points.length; i++) {
-    while (start < i - 1 && (points[i].ts - points[start + 1].ts) / 3600 >= span) start++;
-    const hours = (points[i].ts - points[start].ts) / 3600;
-    const gain = points[i][key] - points[start][key];
-    if (hours >= span * 0.6 && gain >= 0) out.push({ ts: points[i].ts, rate: gain / hours });
-  }
-  return out;
-}
-
-/* ---------------- sections ---------------- */
-function renderFigures(data) {
-  const host = document.getElementById("figures");
-  host.innerHTML = "";
-  const totals = data.totals || {}, session = data.session || {};
-  const figures = [
-    [W.figBots, num(totals.online), W.figBotsFoot(num(totals.bots))],
-    [W.figLevel, one(totals.avgLevelOnline), W.figLevelFoot(num(totals.maxLevel))],
-    [W.figKills, num(totals.kills),
-      session.hours ? W.figKillsFoot(num(session.kills / Math.max(session.hours, 0.01))) : ""],
-    [W.figQuests, num(totals.quests), session.since ? W.figQuestsFoot(session.since) : ""],
-    [W.figLevels, num(session.levels), session.levelHours ? W.figLevelsFoot(one(session.levelHours)) : ""],
-    [W.figServer, one((data.uptime || {}).hours) + " h",
-      PUBLIC ? W.figServerRunning : W.figServerMemory(num((data.server || {}).ramMo))],
-  ];
-  for (const figure of figures) {
-    host.append(el("div", { class: "figure" },
-      '<div class="label">' + esc(figure[0]) + '</div><div class="value num">' + esc(figure[1]) +
-      '</div><div class="foot">' + esc(figure[2]) + "</div>"));
-  }
-}
-
-function splitBar(host, parts) {
-  host.innerHTML = "";
-  const total = Math.max(1, parts.reduce((sum, p) => sum + p.count, 0));
-  const bar = el("div", { class: "split" });
-  for (const p of parts) bar.append(el("i", { style: "width:" + (p.count / total * 100) + "%;background:" + p.color }));
-  host.append(bar);
-  host.append(el("div", { class: "legend" }, parts.map(p =>
-    '<span><span class="key" style="background:' + p.color + '"></span>' + esc(p.label) +
-    ' <b class="num">' + num(p.count) + "</b>" +
-    (p.note ? ' <span class="meta">· ' + esc(p.note) + "</span>" : "") + "</span>").join("")));
-}
-
-function renderFactions(data) {
-  const host = document.getElementById("factions");
-  const f = data.factions;
-  if (!f) { host.innerHTML = '<p class="empty">' + esc(W.noData) + "</p>"; return; }
-  splitBar(host, [
-    { label: "Alliance", count: f.online.alliance || 0, color: "var(--alliance)",
-      note: W.levelWord(one(f.levelOnline.alliance)) },
-    { label: "Horde", count: f.online.horde || 0, color: "var(--horde)",
-      note: W.levelWord(one(f.levelOnline.horde)) },
-  ]);
-}
-
-function renderRoles(data) {
-  const host = document.getElementById("roles");
-  const roles = data.roles || {};
-  const total = Math.max(1, (roles.tank || 0) + (roles.heal || 0) + (roles.dps || 0));
-  const share = n => Math.round((n || 0) / total * 100) + " %";
-  splitBar(host, [
-    { label: W.tanks, count: roles.tank || 0, color: "var(--alliance)", note: share(roles.tank) },
-    { label: W.healers, count: roles.heal || 0, color: "var(--accent)", note: share(roles.heal) },
-    { label: W.damage, count: roles.dps || 0, color: "var(--horde)", note: share(roles.dps) },
-  ]);
-}
-
-function rankedList(host, rows, options) {
-  host.innerHTML = "";
-  if (!rows || !rows.length) { host.append(el("p", { class: "empty" }, options.waiting || W.measuring)); return; }
-  const bar = options.bar || options.value;
-  const max = Math.max.apply(null, rows.map(bar).concat([1]));
-  const body = el("tbody");
-  rows.forEach((row, i) => {
-    const line = el("tr", row.online === false ? { class: "offline" } : {});
-    line.append(el("td", { class: "rank" }, i < 3 ? medals[i] : String(i + 1)));
-    line.append(el("td", {}, '<div class="name clickable">' + (row.faction ? factionDot(row.faction) : "") +
-      esc(row.name) + '</div><div class="meta">' + esc(options.line2(row)) + "</div>"));
-    line.append(el("td", { style: "width:32%" },
-      '<div class="bar"><i style="width:' + (bar(row) / max * 100) + '%"></i></div>'));
-    line.append(el("td", { class: "r" },
-      '<b class="num">' + num(options.value(row)) + '</b> <span class="meta">' + esc(options.unit) + "</span>"));
-    body.append(line);
-  });
-  const table = el("table");
-  table.append(body);
-  host.append(table);
-}
-
-function renderZones(data) {
-  const host = document.getElementById("zones");
-  const zones = data.zones || [];
-  host.innerHTML = "";
-  if (!zones.length) { host.innerHTML = '<p class="empty">' + esc(W.noData) + "</p>"; return; }
-  const max = Math.max.apply(null, zones.map(z => z.count).concat([1]));
-  const body = el("tbody");
-  for (const zone of zones) {
-    const line = el("tr");
-    line.append(el("td", {}, '<span class="name">' + esc(zone.name) + "</span>"));
-    line.append(el("td", { style: "width:46%" },
-      '<div class="split" style="height:8px"><i style="width:' + (zone.alliance / max * 100) +
-      '%;background:var(--alliance)"></i><i style="width:' + ((zone.count - zone.alliance) / max * 100) +
-      '%;background:var(--horde)"></i></div>'));
-    line.append(el("td", { class: "r" }, '<b class="num">' + num(zone.count) + "</b>"));
-    body.append(line);
-  }
-  const table = el("table");
-  table.append(body);
-  host.append(table);
-  host.append(el("p", { class: "meta", style: "margin:12px 0 0" },
-    '<span class="key" style="background:var(--alliance)"></span>Alliance' +
-    '<span class="key" style="background:var(--horde);margin-left:14px"></span>Horde'));
-}
-
-function renderCompare(data) {
-  const host = document.getElementById("compare");
-  const compare = data.compare || {};
-  host.innerHTML = "";
-  const labels = { kills: W.figKills, quests: W.figQuests, levels: W.figLevels };
-  const body = el("tbody");
-  let anything = false;
-  for (const key of ["kills", "quests", "levels"]) {
-    const row = compare[key] || {};
-    if (row.today === null || row.today === undefined) continue;
-    anything = true;
-    const before = row.before;
-    let change = '<span class="meta">—</span>';
-    if (before !== null && before !== undefined && before > 0) {
-      const delta = (row.today - before) / before * 100;
-      const up = delta >= 0;
-      change = '<span style="color:' + (up ? "var(--good)" : "var(--bad)") + '">' +
-        (up ? "▲ +" : "▼ ") + Math.round(delta) + " %</span>";
-    }
-    const line = el("tr");
-    line.append(el("td", {}, '<span class="name">' + esc(labels[key]) + "</span>"));
-    line.append(el("td", { class: "r num" }, num(row.today)));
-    line.append(el("td", { class: "r meta num" }, before === null || before === undefined ? "—" : num(before)));
-    line.append(el("td", { class: "r" }, change));
-    body.append(line);
-  }
-  if (!anything) { host.innerHTML = '<p class="empty">' + esc(W.compareWait) + "</p>"; return; }
-  const table = el("table");
-  table.append(el("thead", {}, '<tr><th></th><th class="r">' + esc(W.compareDay) + '</th><th class="r">' +
-    esc(W.compareBefore) + '</th><th class="r">' + esc(W.compareChange) + "</th></tr>"));
-  table.append(body);
-  host.append(table);
-}
-
-function renderWatch(data) {
-  const watch = data.watch || {}, server = data.server || {};
-  const host = document.getElementById("watch");
-  host.innerHTML = "";
-  const missing = watch.stuck === null || watch.stuck === undefined;
-  const cells = [
-    [W.watchDead, watch.deadNow, watch.deadNow > 30],
-    [W.watchStuck, missing ? "—" : watch.stuck,
-      !missing && watch.stuck > ((data.totals || {}).online || 1000) * 0.1],
-    [W.watchCrashes, PUBLIC ? "—" : server.crashes24h, server.crashes24h > 0],
-  ];
-  for (const cell of cells) {
-    host.append(el("div", {}, '<div class="k">' + esc(cell[0]) + '</div><div class="n' + (cell[2] ? " alert" : "") +
-      '">' + esc(cell[1] === undefined ? "—" : cell[1]) + "</div>"));
-  }
-
-  const span = (data.xpRate || {}).hours;
-  const names = document.getElementById("stuckNames");
-  names.innerHTML = (watch.stuckNames && watch.stuckNames.length)
-    ? '<p class="meta" style="margin:10px 0 0">' + esc(W.stuckLine(one(span),
-      watch.stuckNames.join(", ") + (watch.stuck > watch.stuckNames.length ? "…" : ""))) + "</p>"
-    : "";
-
-  const events = document.getElementById("incidents");
-  events.innerHTML = "";
-  const rows = watch.incidents;
-  if (!rows) return;   // no watch journal on this server: nothing to list, and nothing to apologise for
-  if (!rows.length) { events.innerHTML = '<li><span class="meta">' + esc(W.watchQuiet) + "</span></li>"; return; }
-  for (const row of rows) {
-    events.append(el("li", {}, "<time>" + esc(row.at) + "</time><span>" + esc(row.what) + "</span>"));
-  }
-}
-
-function renderLevels(data) {
-  const host = document.getElementById("levelBars");
-  host.innerHTML = "";
-  const rows = data.levels || [];
-  if (!rows.length) { host.innerHTML = '<p class="empty">' + esc(W.noData) + "</p>"; return; }
-  // One band per ten levels, the way the count below sorts them: 1-9, then 10-19 and so on.
-  const buckets = [{ label: "1-9", count: 0 }];
-  for (let start = 10; start <= 50; start += 10) {
-    buckets.push({ label: start + "-" + (start === 50 ? 60 : start + 9), count: 0 });
-  }
-  for (const row of rows) {
-    buckets[Math.min(buckets.length - 1, Math.floor(row.level / 10))].count += row.count;
-  }
-  const max = Math.max.apply(null, buckets.map(b => b.count).concat([1]));
-  for (const bucket of buckets) {
-    const cell = el("div", {});
-    cell.append(el("b", { class: "num" }, num(bucket.count)));
-    cell.append(el("i", { style: "height:" + (bucket.count / max * 100) + "%" }));
-    cell.append(el("span", {}, bucket.label));
-    host.append(cell);
-  }
-}
-
-let allClasses = false;
-function renderClasses(data) {
-  const host = document.getElementById("classes");
-  const classes = data.classes || [];
-  host.innerHTML = "";
-  if (!classes.length) { host.innerHTML = '<p class="empty">' + esc(W.noData) + "</p>"; return; }
-  const max = Math.max.apply(null, classes.map(c => c.avgLevel).concat([1]));
-  const shown = allClasses ? classes : classes.slice(0, 8);
-  const table = el("table");
-  table.append(el("thead", {}, '<tr><th class="rank">#</th><th>' + esc(W.colClass) + "</th><th>" +
-    esc(W.colAvgLevel) + '</th><th class="r">' + esc(W.colBots) + '</th><th class="r">' + esc(W.colKills) +
-    "</th><th>" + esc(W.colPodium) + "</th></tr>"));
-  const body = el("tbody");
-  shown.forEach((c, i) => {
-    const podium = (c.podium || []).map((p, k) =>
-      '<span class="meta" style="white-space:nowrap">' + medals[k] + " " + factionDot(p.faction) + esc(p.name) +
-      ' <b class="num" style="color:var(--text-primary)">' + esc(p.level) + "</b></span>").join("<br>");
-    const line = el("tr");
-    line.append(el("td", { class: "rank" }, String(i + 1)));
-    line.append(el("td", {}, '<span class="name">' + esc(c.name) + "</span>"));
-    line.append(el("td", { style: "width:24%" },
-      '<div class="bar"><i style="width:' + (c.avgLevel / max * 100) + '%"></i></div>' +
-      '<div class="meta num">' + one(c.avgLevel) + "</div>"));
-    line.append(el("td", { class: "r num" }, num(c.bots)));
-    line.append(el("td", { class: "r num" }, num(c.kills)));
-    line.append(el("td", {}, podium || '<span class="meta">—</span>'));
-    body.append(line);
-  });
-  table.append(body);
-  host.append(table);
-  if (classes.length > 8) {
-    const more = el("button", { class: "ghost", style: "margin-top:14px", type: "button" },
-      allClasses ? W.showFew : W.showAll(classes.length));
-    more.addEventListener("click", () => { allClasses = !allClasses; renderClasses(LAST); });
-    host.append(more);
-  }
-}
-
-let topKey = "xp";
-function renderTop(data) {
-  const rows = (data.top || {})[topKey] || [];
-  rankedList(document.getElementById("top"), rows, {
-    value: topKey === "xp" ? (b => b.level) : (b => b[topKey]),
-    // Ten bots at the level cap would all draw a full bar: inside a level, the experience separates them.
-    bar: topKey === "xp" ? (b => b.xp) : null,
-    unit: topKey === "xp" ? W.unitLevel : topKey === "kills" ? W.unitKills : W.unitQuests,
-    line2: b => b.cls + (b.spec ? " · " + b.spec : "") + (b.online ? "" : " · " + W.offline),
-  });
-}
-
-function renderXpRate(data) {
-  const rate = data.xpRate || {};
-  document.getElementById("xpSub").textContent = rate.hours >= 1 ? W.xpSpan(one(rate.hours)) : W.xpMeasuring;
-  rankedList(document.getElementById("xpRate"), rate.top, {
-    value: b => b.xpPerHour, unit: W.xpUnit, waiting: W.xpWait,
-    line2: b => b.cls + (b.spec ? " · " + b.spec : "") + " · " + W.levelShort(b.level) +
-      (b.online ? "" : " · " + W.offline),
-  });
-}
-
-function renderChat(data) {
-  const host = document.getElementById("chat");
-  const chat = data.chat;
-  const sub = document.getElementById("chatSub");
-  if (!chat) { sub.textContent = ""; host.innerHTML = '<p class="empty">' + esc(W.chatNone) + "</p>"; return; }
-  sub.textContent = W.chatSub(num(chat.messages), num(chat.talkers));
-  rankedList(host, chat.top, {
-    value: t => t.messages, unit: W.chatUnit,
-    line2: t => t.channel ? W.chatChannel(num(t.channel)) : W.chatOther,
-  });
-}
-
-function renderLoot(data) {
-  const host = document.getElementById("loot");
-  const loot = data.loot;
-  const sub = document.getElementById("lootSub");
-  host.innerHTML = "";
-  if (!loot) { sub.textContent = ""; host.innerHTML = '<p class="empty">' + esc(W.lootNone) + "</p>"; return; }
-  sub.textContent = W.lootSub(num(loot.total));
-  if (!loot.rows.length) { host.innerHTML = '<p class="empty">' + esc(W.lootQuiet) + "</p>"; return; }
-  const names = data.classNames || {};
-  const body = el("tbody");
-  for (const row of loot.rows) {
-    const line = el("tr");
-    line.append(el("td", { class: "meta num", style: "white-space:nowrap" }, clock(row.ts)));
-    line.append(el("td", {}, '<div class="q' + (row.quality > 5 ? 5 : row.quality) + '">' +
-      esc(row.item) + (row.count > 1 ? " ×" + row.count : "") +
-      '</div><div class="meta">' + esc(names[row.cls] || "") + " · " + esc(W.levelShort(row.level)) + "</div>"));
-    line.append(el("td", { class: "r" }, '<div class="name clickable">' + esc(row.bot) +
-      '</div><div class="meta">ilvl ' + esc(row.ilvl) + "</div>"));
-    body.append(line);
-  }
-  const table = el("table");
-  table.append(body);
-  host.append(table);
-}
-
-function renderActions(data) {
-  const host = document.getElementById("actions");
-  const actions = data.actions;
-  host.innerHTML = "";
-  if (!actions || !actions.rows || !actions.rows.length) {
-    host.innerHTML = '<p class="empty">' + esc(W.spellsNone) + "</p>";
-    return;
-  }
-  document.getElementById("actionsSub").textContent = W.spellsSub(one(actions.hours));
-  const rows = actions.rows.filter(r => r.tried > 0).sort((a, b) => b.cast - a.cast);
-  const table = el("table");
-  table.append(el("thead", {}, "<tr><th>" + esc(W.colAction) + "</th><th>" + esc(W.colSuccess) +
-    '</th><th class="r">' + esc(W.colCast) + '</th><th class="r">' + esc(W.colTried) + "</th></tr>"));
-  const body = el("tbody");
-  for (const row of rows) {
-    const share = row.cast / row.tried;
-    const line = el("tr");
-    line.append(el("td", {}, '<span class="name">' + esc(W.spellNames[row.key] || row.key) + "</span>"));
-    line.append(el("td", { style: "width:36%" }, '<div class="bar"><i style="width:' + Math.round(share * 100) +
-      "%;background:" + (share > 0.5 ? "var(--accent)" : "var(--gold)") + '"></i></div>'));
-    line.append(el("td", { class: "r num" }, num(row.cast)));
-    line.append(el("td", { class: "r num" },
-      num(row.tried) + ' <span class="meta">' + Math.round(share * 100) + " %</span>"));
-    body.append(line);
-  }
-  table.append(body);
-  host.append(table);
-}
-
-/* ---------------- one bot's sheet ---------------- */
-function openSheet(name) {
-  const bot = ((LAST && LAST.bots) || []).find(b => b.n === name);
-  if (!bot) return;
-  const rate = ((LAST.xpRate || {}).top || []).find(g => g.name === name);
-  const rows = [
-    [W.sheetLevel, bot.l], [W.sheetKills, num(bot.k)], [W.sheetQuests, num(bot.q)],
-    [W.sheetZone, bot.z || "—"], [W.sheetPlayed, one(bot.h) + " h"],
-    [W.sheetXp, rate ? num(rate.xpPerHour) + " " + W.xpUnit : "—"],
-  ];
-  document.getElementById("sheetBody").innerHTML =
-    "<h3>" + (bot.f ? factionDot(bot.f) : "") + esc(bot.n) + "</h3>" +
-    '<p class="who">' + esc(bot.c) + (bot.s ? " · " + esc(bot.s) : "") + " · " + esc(W[bot.r] || bot.r) +
-    (bot.o ? "" : " · " + esc(W.offline)) + "</p><dl>" +
-    rows.map(r => "<dt>" + esc(r[0]) + "</dt><dd>" + esc(r[1]) + "</dd>").join("") +
-    '</dl><button class="ghost close" type="button" id="sheetClose">' + esc(W.close) + "</button>";
-  const sheet = document.getElementById("sheet");
-  document.getElementById("sheetClose").addEventListener("click", () => sheet.close());
-  sheet.showModal();
-}
-
-document.addEventListener("click", event => {
-  const target = event.target.closest(".name");
-  if (target && LAST && (LAST.bots || []).some(b => b.n === target.textContent.trim())) {
-    openSheet(target.textContent.trim());
-  }
-});
-
-const search = document.getElementById("search");
-const results = document.getElementById("results");
-search.addEventListener("input", () => {
-  const wanted = search.value.trim().toLowerCase();
-  results.innerHTML = "";
-  if (wanted.length < 2 || !LAST) { results.hidden = true; return; }
-  const found = (LAST.bots || []).filter(b => b.n.toLowerCase().includes(wanted)).slice(0, 12);
-  if (!found.length) { results.hidden = true; return; }
-  for (const bot of found) {
-    const button = el("button", { type: "button" },
-      (bot.f ? factionDot(bot.f) : "") + "<b>" + esc(bot.n) + "</b> " +
-      '<span class="meta">' + esc(bot.c) + " · " + esc(W.levelShort(bot.l)) + "</span>");
-    button.addEventListener("click", () => { results.hidden = true; search.value = ""; openSheet(bot.n); });
-    results.append(button);
-  }
-  results.hidden = false;
-});
-document.addEventListener("click", event => {
-  if (!event.target.closest(".search")) results.hidden = true;
-});
-
-/* ---------------- page ---------------- */
-let LAST = null;
-function render(data) {
-  LAST = data;
-  if (typeof data.footer === "string" || data.footer === null) {
-    FOOTER = typeof data.footer === "string" ? data.footer : null;
-    renderFooter();
-  }
-  const running = (data.server || {}).running;
-  document.getElementById("stateDot").className = "dot live" + (running ? "" : " off");
-  document.getElementById("stateText").textContent =
-    running ? W.online(num((data.totals || {}).online)) : W.stopped;
-  document.getElementById("updatedPill").textContent = W.updated(data.generatedAt || "—");
-
-  renderFigures(data);
-  renderFactions(data);
-  renderRoles(data);
-  renderZones(data);
-  renderCompare(data);
-  renderWatch(data);
-  renderLevels(data);
-  renderXpRate(data);
-  renderChat(data);
-  renderClasses(data);
-  renderTop(data);
-  renderLoot(data);
-  renderActions(data);
-
-  const pace = rates(data.history, "kills");
-  lineChart(document.getElementById("paceChart"), pace,
-    { value: p => p.rate, label: W.paceTitle, unit: W.paceSub });
-  document.getElementById("paceSub").textContent = pace.length ? W.paceSub : "";
-  const levels = rates(data.history, "levelUps");
-  lineChart(document.getElementById("levelsChart"), levels,
-    { value: p => p.rate, label: W.progressTitle, unit: W.progressSub, color: "var(--accent)" });
-  document.getElementById("progressSub").textContent = levels.length ? W.progressSub : "";
-  const dead = (data.history || []).filter(p => p.dead !== undefined).map(p => ({ ts: p.ts, dead: p.dead }));
-  lineChart(document.getElementById("deadChart"), dead,
-    { value: p => p.dead, label: W.deadTitle, unit: W.figBots, color: "var(--horde)" });
-}
-
-document.getElementById("topTabs").addEventListener("click", event => {
-  const button = event.target.closest("button[data-key]");
-  if (!button) return;
-  topKey = button.dataset.key;
-  for (const other of document.querySelectorAll("#topTabs button")) {
-    other.setAttribute("aria-selected", String(other === button));
-  }
-  if (LAST) renderTop(LAST);
-});
-
-async function refresh() {
-  try {
-    const answer = await fetch(API + (PUBLIC ? "?t=" + Date.now() : ""), { cache: "no-store" });
-    render(await answer.json());
-  } catch (error) {
-    document.getElementById("stateText").textContent = W.unreachable;
-    document.getElementById("stateDot").className = "dot off";
-  }
-}
-applyWords();
-refresh();
-setInterval(refresh, 20000);
-</script>
+<script src="static/dashboard.js"></script>
 </body>
 </html>

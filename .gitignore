@@ -11,3 +11,13 @@ xp-history.json
 *.log
 *.tmp
 levels.json
+
+# Backups the Settings page takes before it writes a .conf.
+config-backups/
+
+# Blizzard's art, extracted from your own client by tools/gen_mapart.py and
+# tools/gen_uiart.py. Kept local, never committed.
+maps/
+ui/
+
+__pycache__/
