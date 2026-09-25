@@ -907,19 +907,33 @@ async function loadWorld() {
   return WORLD;
 }
 
+// The public page reads live.json, which the dashboard copies beside it every 12 s; the local one
+// asks its server. live.json is revalidated rather than fetched again: unchanged, it costs nothing.
+const LIVE_EVERY = PUBLIC ? 12000 : 5000;
+const LIVE_STALE = 90;  // seconds: older than this, the server or the dashboard has stopped
+
 async function refreshLive() {
-  if (PUBLIC) return;
-  /* private:start */
+  let url = "live.json";
+  /* private:start */url = "/api/live";/* private:end */
   try {
-    const answer = await fetch("/api/live", { cache: "no-store" });
+    const answer = await fetch(url, { cache: PUBLIC ? "no-cache" : "no-store" });
     const data = await answer.json();
+    let age = data.age === undefined ? null : data.age;
+    if (PUBLIC && data.at) {
+      // How old the file is, by the web server's own clock (the visitor's may be off), plus how old
+      // the snapshot already was when it was copied.
+      const written = Date.parse(answer.headers.get("last-modified") || "");
+      const now = Date.parse(answer.headers.get("date") || "");
+      age = (age || 0) + (written && now ? Math.max(0, Math.round((now - written) / 1000)) : 0);
+    }
     const byName = {};
-    for (const bot of data.bots || []) byName[bot.n] = bot;
-    LIVE = { byName: byName, age: data.age === undefined ? null : data.age, missing: data.missing || null };
+    let missing = data.missing || null;
+    if (PUBLIC && data.at && age > LIVE_STALE) missing = "the server is not sending live positions";
+    else for (const bot of data.bots || []) byName[bot.n] = bot;
+    LIVE = { byName: byName, age: data.absent ? null : age, missing: missing };
   } catch (error) {
-    LIVE = { byName: {}, age: null, missing: "live status unavailable" };
+    LIVE = { byName: {}, age: null, missing: PUBLIC ? null : "live status unavailable" };
   }
-  /* private:end */
 }
 
 // World coordinates are rotated relative to the map: LocLeft and LocRight bound
@@ -1724,7 +1738,7 @@ showPage();
 loadArt();/* private:end */
 refresh();
 setInterval(refresh, 20000);
-setInterval(refreshLiveMap, 5000);
+setInterval(refreshLiveMap, LIVE_EVERY);
 window.addEventListener("hashchange", refreshLiveMap);
 document.addEventListener("visibilitychange", refreshLiveMap);
 // The chat feed follows the log only while its page is open.

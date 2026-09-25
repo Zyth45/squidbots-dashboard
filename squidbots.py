@@ -403,23 +403,24 @@ STATUS_STALE = 60   # seconds; older than this the server has stopped writing it
 
 # The last snapshot read: (mtime_ns, size), its "at", and its bots already encoded, so the file is
 # parsed once per snapshot however many pages ask for it.
-_LIVE_CACHE = {"key": None, "at": 0, "bots": b"[]"}
+_LIVE_CACHE = {"key": None, "at": 0, "parsed": [], "bots": b"[]"}
 _LIVE_LOCK = threading.Lock()
 
 
-def live_status_body():
-    """The /api/live answer, as JSON bytes: {"at", "age", "bots"} from the module's snapshot;
-    {"bots": [], "absent": true} on a realm with no such module (the usual case: nothing in the repack
-    writes it); {"bots": [], "missing": reason} when the file is there but stale or unreadable."""
-    def answer(payload):
-        return json.dumps(payload, ensure_ascii=False).encode("utf-8")
+def _answer(payload):
+    return json.dumps(payload, ensure_ascii=False).encode("utf-8")
 
+
+def load_live():
+    """(at, bots, bots encoded) of the current snapshot, or, when there is none to show, the answer
+    saying why: {"bots": [], "absent": true} on a realm with no such module (the usual case: nothing
+    in the repack writes it), {"bots": [], "missing": reason} when the file is unreadable."""
     try:
         stat = os.stat(STATUS_FILE)
     except FileNotFoundError:
-        return answer({"bots": [], "absent": True})
+        return {"bots": [], "absent": True}
     except OSError as error:
-        return answer({"bots": [], "missing": "status file unreadable: %s" % error})
+        return {"bots": [], "missing": "status file unreadable: %s" % error}
     key = (stat.st_mtime_ns, stat.st_size)
     with _LIVE_LOCK:
         if _LIVE_CACHE["key"] != key:
@@ -432,17 +433,79 @@ def live_status_body():
                     break
                 except PermissionError as error:
                     if attempt == 2:
-                        return answer({"bots": [], "missing": "status file unreadable: %s" % error})
+                        return {"bots": [], "missing": "status file unreadable: %s" % error}
                     time.sleep(0.05)
                 except (OSError, ValueError) as error:
-                    return answer({"bots": [], "missing": "status file unreadable: %s" % error})
-            _LIVE_CACHE.update(key=key, at=data.get("at") or 0,
-                               bots=answer(data.get("bots") or []))
-        at, bots = _LIVE_CACHE["at"], _LIVE_CACHE["bots"]
+                    return {"bots": [], "missing": "status file unreadable: %s" % error}
+            bots = data.get("bots") or []
+            _LIVE_CACHE.update(key=key, at=data.get("at") or 0, parsed=bots, bots=_answer(bots))
+        return _LIVE_CACHE["at"], _LIVE_CACHE["parsed"], _LIVE_CACHE["bots"]
+
+
+def live_status_body():
+    """The /api/live answer, as JSON bytes: {"at", "age", "bots"} from the module's snapshot, or
+    load_live()'s reason, or {"bots": [], "missing": reason} when the snapshot is stale."""
+    live = load_live()
+    if isinstance(live, dict):
+        return _answer(live)
+    at, _parsed, bots = live
     age = max(0, round(time.time() - float(at)))
     if age > STATUS_STALE:
-        return answer({"bots": [], "missing": "status file is %d s old; is the server running?" % age})
+        return _answer({"bots": [], "missing": "status file is %d s old; is the server running?" % age})
     return b'{"at": %d, "age": %d, "bots": ' % (int(at), age) + bots + b"}"
+
+
+# The public page's live view: live.json beside it, every LIVE_PUBLISH_EVERY seconds. Only the
+# fields the map and the cards show, and never a real player's name: a group led by a player loses
+# its leader's name, and a fight with a player reads "Fighting a player".
+LIVE_PUBLISH_EVERY = 12
+PUBLIC_LIVE_FIELDS = ("n", "l", "hp", "pt", "pw", "m", "x", "y", "zone", "combat", "dead", "grp", "lead",
+                      "task", "quests")
+_PLAYERS = {"at": 0.0, "names": set()}
+
+
+def real_player_names():
+    """Names of the characters that are not bots, read again every five minutes."""
+    if time.time() - _PLAYERS["at"] > 300:
+        rows = mysql("SELECT c.name FROM {characters}.characters c JOIN {auth}.account a ON a.id = c.account "
+                     "WHERE a.username NOT LIKE 'RNDBOT%'".format(**DB))
+        _PLAYERS.update(at=time.time(), names={row[0] for row in rows})
+    return _PLAYERS["names"]
+
+
+def public_live(bots, players):
+    out = []
+    for bot in bots:
+        shown = {key: bot[key] for key in PUBLIC_LIVE_FIELDS if key in bot}
+        if shown.get("lead") in players:
+            del shown["lead"]
+        task = shown.get("task") or ""
+        if task.startswith("Fighting ") and task[len("Fighting "):] in players:
+            shown["task"] = "Fighting a player"
+        out.append(shown)
+    return out
+
+
+def live_publish_loop():
+    last_error = None
+    while True:
+        try:
+            live = load_live()
+            if isinstance(live, dict):
+                body = {"at": 0, "bots": [], "absent": True} if live.get("absent") else {"at": 0, "bots": []}
+            else:
+                at, bots, _encoded = live
+                age = max(0, round(time.time() - float(at)))
+                body = {"at": int(at), "age": age,
+                        "bots": [] if age > STATUS_STALE else public_live(bots, real_player_names())}
+            write_atomic(os.path.join(PUBLISH_DIR, "live.json"),
+                         json.dumps(body, ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
+            last_error = None
+        except Exception as error:  # the NAS may be asleep: said once, tried again
+            if str(error) != last_error:
+                print("Public live view failed:", error, flush=True)
+                last_error = str(error)
+        time.sleep(LIVE_PUBLISH_EVERY)
 
 
 # Journal of the watcher (Surveiller-Et-Relancer.ps1): restarts and freezes, most recent first.
@@ -1218,5 +1281,7 @@ if __name__ == "__main__":
     print("SquidBots dashboard: http://localhost:%d  (Ctrl+C to stop)" % PORT, flush=True)
     if PUBLISH_DIR:
         threading.Thread(target=publish_loop, daemon=True).start()
-        print("Public copy refreshed every minute in %s" % PUBLISH_DIR, flush=True)
+        threading.Thread(target=live_publish_loop, daemon=True).start()
+        print("Public copy refreshed every minute in %s (live view every %d s)" % (PUBLISH_DIR, LIVE_PUBLISH_EVERY),
+              flush=True)
     server.serve_forever()
