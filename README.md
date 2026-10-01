@@ -113,6 +113,22 @@ installed). It edits values in place, never adds or reorders lines, and backs th
 files at startup, so it is easiest to use with the server stopped. Writes are accepted from the
 machine itself only, from the dashboard's own page. The dashboard never writes to the game database.
 
+## Minds: bots with a personality, a memory and a voice
+
+A **Minds** page (private version only) turns the bots you talk to into characters: each one gets a personality,
+remembers you and your friends between conversations, answers in the chat you spoke in, and can look at its own bags
+and quests and act on a request ("invite me", "follow me"). Bots you do not talk to stay ordinary playerbots.
+
+It needs the SquidBots fork of the LLM chat module ([synthiqbots, branch `coa`](https://github.com/jmcelreavey/synthiqbots))
+in the core and the small mind service in this folder (`python run-mind.py`). From the page you choose the model
+that answers (OpenAI, Anthropic, DeepSeek, OpenRouter or a local Ollama), watch what it costs, read every
+conversation and exactly what the model was shown, edit or write personalities, talk to a bot without logging in,
+and pause everything with one switch. See [docs/minds.md](docs/minds.md).
+
+![The Minds page: models, usage, and every conversation](docs/minds.png)
+
+![One bot's mind: personality, a chat with it, what the model was shown, memories and feelings](docs/minds-bot.png)
+
 ## Map
 
 `worldmap.json` (rebuilt by `tools/gen_worldmap.py`) gives the map its zones out of the box: each

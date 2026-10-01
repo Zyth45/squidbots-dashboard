@@ -1,0 +1,125 @@
+/* The Minds page. Private: loaded only by the local dashboard, never part of the public copy. */
+.ico[data-icon="minds"]::before { content: "🧠"; }
+
+.mind-figures { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin: 8px 0 4px; }
+@media (min-width: 900px) { .mind-figures { grid-template-columns: repeat(5, 1fr); } }
+.mind-state { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 4px; }
+.mind-state code { font-size: 12px; color: var(--text-secondary); }
+.mind-awake { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; align-items: center; }
+.mind-awake .meta { margin-right: 4px; }
+.chip { font: inherit; font-size: 12px; padding: 3px 10px; border-radius: 12px; cursor: pointer;
+  color: var(--text-primary); background: rgba(10, 8, 6, .75); border: 1px solid var(--border); }
+.chip:hover { border-color: var(--gold-bright); color: var(--gold-bright); }
+#mindMsg, #mindProfilesMsg, #mindBotMsg, #mindSettingsMsg { min-height: 18px; margin: 8px 0 0; }
+.bad-msg { color: #ff9a8a; }
+.good-msg { color: var(--good); }
+.mind-connect { margin-top: 12px; font-size: 12.5px; color: var(--text-secondary); }
+.mind-connect summary { cursor: pointer; color: var(--gold); }
+.mind-connect pre { margin: 8px 0 0; padding: 10px 12px; overflow-x: auto; font-size: 12px; color: var(--text-primary);
+  background: #0a0805; border: 1px solid var(--hairline); border-radius: 2px; }
+.mind-notice { margin: 10px 0 0; padding: 7px 11px; font-size: 12.5px; color: #ffcf8a; background: rgba(142, 26, 14, .28);
+  border-left: 2px solid var(--gold-bright); }
+
+.mind-lanes { display: grid; gap: 10px; margin: 6px 0 14px; }
+@media (min-width: 900px) { .mind-lanes { grid-template-columns: repeat(3, 1fr); } }
+.mind-lane { padding: 10px 12px; border: 1px solid var(--hairline); border-radius: 3px; background: rgba(8, 6, 4, .5); }
+.mind-lane label { display: block; font-weight: 600; }
+.mind-lane .meta { display: block; margin: 2px 0 6px; }
+.mind-lane select { width: 100%; }
+
+.ok { color: var(--good); }
+.warn { color: #ffcf8a; }
+.bad { color: var(--bad); }
+td.actions { white-space: nowrap; text-align: right; }
+td.actions .btn { margin-left: 4px; }
+
+.mind-form { display: grid; gap: 10px 14px; margin-top: 12px; padding: 14px; border: 1px solid var(--border);
+  border-radius: 3px; background: rgba(8, 6, 4, .55); }
+@media (min-width: 900px) { .mind-form { grid-template-columns: repeat(3, 1fr); } }
+.mind-form .wide { grid-column: 1 / -1; }
+.mind-form label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--text-secondary); }
+.mind-form input, .mind-form select, .mind-form textarea { width: 100%; }
+.mind-form .hint { font-size: 11.5px; color: var(--text-muted); }
+.mind-form .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.mind-form h3, .mind-bot h3, .mind-bot h4 { margin: 0; font-family: var(--display); color: var(--gold); letter-spacing: .04em; }
+textarea { font: inherit; font-size: 13px; padding: 6px 9px; border-radius: 2px; border: 1px solid var(--border);
+  background: #0a0805; color: var(--text-primary); resize: vertical; min-height: 84px;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, .8); }
+textarea:focus { outline: none; border-color: var(--gold-bright); }
+
+.mind-bot h3 { font-size: 17px; }
+.mind-bot h4 { margin: 20px 0 6px; font-size: 14px; padding-bottom: 5px; border-bottom: 1px solid var(--border); }
+.mind-mem { list-style: none; margin: 0; padding: 0; }
+.mind-mem li { display: grid; grid-template-columns: 62px 1fr auto; gap: 10px; align-items: start; padding: 7px 0;
+  border-top: 1px solid var(--hairline); font-size: 13px; }
+.mind-mem li:first-child { border-top: 0; }
+.mind-mem .kind { font-size: 10.5px; text-transform: uppercase; letter-spacing: .07em; color: var(--text-muted); padding-top: 2px; }
+.mind-mem .kind.fact { color: var(--accent); }
+.mind-mem .ago { display: block; font-size: 11.5px; color: var(--text-muted); }
+.mind-mem button { font-size: 11px; }
+.mind-memory-add { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.mind-memory-add input[name="text"] { flex: 1 1 260px; }
+.mind-affinity { display: inline-block; width: 70px; vertical-align: middle; }
+
+/* ---------- chat style: roleplay or fake players ---------- */
+.mind-modes { display: grid; gap: 10px; margin: 6px 0 10px; }
+@media (min-width: 900px) { .mind-modes { grid-template-columns: repeat(2, 1fr); } }
+.mind-mode { display: flex; flex-direction: column; gap: 6px; text-align: left; font: inherit; padding: 12px 14px; cursor: pointer;
+  color: var(--text-secondary); background: rgba(8, 6, 4, .5); border: 1px solid var(--hairline); border-radius: 3px;
+  transition: border-color .2s cubic-bezier(.22, 1, .36, 1), background .2s cubic-bezier(.22, 1, .36, 1); }
+.mind-mode strong { font-family: var(--display); font-size: 15px; letter-spacing: .04em; color: var(--text-primary); }
+.mind-mode span { font-size: 12.5px; line-height: 1.45; }
+.mind-mode:hover { border-color: var(--gold); }
+.mind-mode.active { border-color: var(--gold-bright); background: rgba(40, 28, 10, .6); }
+.mind-mode.active strong { color: var(--gold-bright); }
+.mind-form.dim { opacity: .55; }
+.rp-channels { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 6px; }
+.rp-channels .check { flex-direction: row; align-items: center; gap: 5px; font-size: 12.5px; }
+.rp-channels .check input { width: auto; }
+
+
+/* ---------- usage, conversations, playground ---------- */
+h4.mini { margin: 14px 0 4px; font-family: var(--display); font-size: 13px; color: var(--gold); letter-spacing: .04em; }
+.pname { font-weight: 600; }
+.linklike { font: inherit; padding: 0; border: 0; background: none; color: var(--gold); cursor: pointer; text-decoration: underline; }
+.linklike:hover { color: var(--gold-bright); }
+table.turns tr.turn { cursor: pointer; }
+table.turns tr.failed td { background: rgba(142, 26, 14, .18); }
+table.turns .said { color: var(--text-secondary); }
+table.turns .reply { color: var(--text-primary); }
+.lane { display: inline-block; font-size: 10.5px; padding: 1px 7px; border-radius: 9px; text-transform: uppercase; letter-spacing: .06em;
+  color: var(--text-muted); border: 1px solid var(--hairline); }
+.lane.smart { color: var(--accent); border-color: rgba(63, 181, 154, .4); }
+.lane.playground { color: var(--gold); border-color: var(--border); }
+.lane.fast { color: var(--mana); border-color: rgba(58, 115, 232, .4); }
+.mind-sheet { max-width: min(860px, 94vw); }
+.mind-sheet h4 { margin: 16px 0 4px; font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .07em; }
+pre.turn-text, .mind-connect pre#talkMindText { margin: 0; padding: 9px 12px; white-space: pre-wrap; word-break: break-word; font: 12.5px/1.5 var(--body);
+  color: var(--text-primary); background: #0a0805; border: 1px solid var(--hairline); border-radius: 2px; max-height: 300px; overflow: auto; }
+.mind-sheet details { margin-top: 14px; }
+.mind-sheet summary { cursor: pointer; color: var(--gold); }
+
+.mind-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 10px; }
+.state { font-size: 12px; padding: 2px 10px; border-radius: 10px; color: var(--text-secondary); background: rgba(10, 8, 6, .75); border: 1px solid var(--hairline); }
+.state.on { color: var(--good); border-color: rgba(54, 199, 95, .45); }
+.mind-bot .who { margin: 2px 0 6px; color: var(--text-muted); font-size: 13px; }
+
+.playground { border: 1px solid var(--hairline); border-radius: 3px; background: rgba(8, 6, 4, .5); padding: 10px 12px; }
+.talk { max-height: 280px; overflow-y: auto; padding-right: 4px; }
+.talk p { margin: 5px 0; font-size: 13.5px; }
+.talk p.user b { color: var(--alliance); }
+.talk p.assistant b { color: var(--gold-bright); }
+.talk p.thinking { color: var(--text-muted); }
+.talk-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 10px; }
+.talk-form input[name="text"] { flex: 1 1 260px; }
+.talk-form .check { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-secondary); }
+.talk-form .check input { width: auto; }
+
+/* on the existing bot cards, roster and sheet */
+.mind-dot { display: inline-block; width: 7px; height: 7px; margin-left: 5px; border-radius: 50%; vertical-align: 1px; background: var(--text-muted); opacity: .6; }
+.mind-dot.awake { background: var(--good); opacity: 1; box-shadow: 0 0 5px var(--good); }
+.mind-dot.muted { background: var(--bad); opacity: .8; }
+.bot-card .bc-mind { margin-top: 6px; font-size: 12px; color: var(--text-secondary); }
+
+table.turns td:nth-child(5) { white-space: nowrap; }
+.chart svg { width: 100%; height: auto; display: block; }

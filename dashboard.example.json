@@ -30,6 +30,9 @@
   "_comment_footer": "Replaces the line at the foot of the page. An empty string removes it entirely, links included, which is what you want while sharing the page before the sources are ready.",
   "footer": "",
 
+  "_comment_mind": "Optional: the mind service (python run-mind.py) that gives bots personalities and memory. Every key is optional. token: a bearer the worldserver must send (leave empty while host is 127.0.0.1). API keys are never put here: a model names an environment variable, or an entry in mind-secrets.json.",
+  "mind": {"port": 18800, "host": "127.0.0.1", "db": "mind.sqlite", "token": ""},
+
   "_comment_publish": "Optional: a folder a web server serves. The dashboard writes only the public page there (index.html, static/, worldmap.json, maps/, stats.json every minute, live.json every 12 s), so nothing on this machine is reachable from outside.",
   "publishDir": "\\\\my-nas\\www\\bots"
 }

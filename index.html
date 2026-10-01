@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SquidBots – Conquest of Azeroth</title>
 <link rel="stylesheet" href="static/dashboard.css">
+<!-- private:start --><link rel="stylesheet" href="static/minds.css"><!-- private:end -->
 </head>
 <body>
 <div class="app">
@@ -21,6 +22,7 @@
   <a class="nav-link" href="#bots"><i class="ico" data-icon="bots" aria-hidden="true"></i><span data-i18n="navBots"></span></a>
   <a class="nav-link" href="#stats"><i class="ico" data-icon="stats" aria-hidden="true"></i><span data-i18n="navStats"></span></a>
   <a class="nav-link" href="#chat"><i class="ico" data-icon="chat" aria-hidden="true"></i><span data-i18n="navChat"></span></a>
+  <!-- private:start --><a class="nav-link" href="#minds"><i class="ico" data-icon="minds" aria-hidden="true"></i><span data-i18n="navMinds"></span></a><!-- private:end -->
   <!-- private:start --><a class="nav-link" href="#settings"><i class="ico" data-icon="settings" aria-hidden="true"></i><span data-i18n="navSettings"></span></a><!-- private:end -->
 </nav>
 
@@ -177,6 +179,95 @@
   </main>
 
   <!-- private:start -->
+  <main class="page" data-page="minds" hidden>
+    <section class="card" data-msg="mindMsg">
+      <h2><span>Mind service</span> <span class="sub" id="mindSub"></span></h2>
+      <div id="mindStatus"></div>
+      <p class="meta" id="mindMsg" role="status"></p>
+    </section>
+    <section class="card" data-msg="mindChatMsg">
+      <h2><span>Chat style</span> <span class="sub" id="mindChatSub">how the bots talk: characters in the lore, or players at a keyboard</span></h2>
+      <div id="mindChatStyle"></div>
+      <p class="meta" id="mindChatMsg" role="status"></p>
+    </section>
+    <section class="card" data-msg="mindProfilesMsg">
+      <h2><span>Language models</span> <span class="sub">which model answers, and what it may cost</span></h2>
+      <div id="mindProfiles"></div>
+      <div id="mindProfileForm"></div>
+      <p class="meta" id="mindProfilesMsg" role="status"></p>
+    </section>
+    <section class="card" data-msg="mindJevMsg">
+      <h2><span>Jev</span> <span class="sub" id="mindJevSub">a cheap decision model for routine looks-around and short commands</span></h2>
+      <div id="mindJev"></div>
+      <p class="meta" id="mindJevMsg" role="status"></p>
+    </section>
+    <section class="card" data-msg="mindUsageMsg">
+      <h2><span>Usage</span> <span class="sub" id="mindUsageSub"></span></h2>
+      <div class="toolbar">
+        <div class="tabs" role="tablist" id="mindDays">
+          <button role="tab" data-days="7" aria-selected="false">7 days</button>
+          <button role="tab" data-days="14" aria-selected="true">14 days</button>
+          <button role="tab" data-days="30" aria-selected="false">30 days</button>
+        </div>
+      </div>
+      <div id="mindUsage"></div>
+      <p class="meta" id="mindUsageMsg" role="status"></p>
+    </section>
+    <section class="card" data-msg="mindTurnsMsg">
+      <h2><span>Conversations</span> <span class="sub" id="mindTurnsSub"></span></h2>
+      <div class="toolbar">
+        <input id="turnBot" list="mindBotNames" type="search" autocomplete="off" placeholder="Bot">
+        <input id="turnPlayer" type="search" autocomplete="off" placeholder="Player">
+        <div class="tabs" role="tablist" id="turnKind">
+          <button role="tab" data-problems="" aria-selected="true">All</button>
+          <button role="tab" data-problems="1" aria-selected="false">Problems</button>
+        </div>
+        <button class="btn small" type="button" id="turnRefresh">Refresh</button>
+      </div>
+      <div id="mindTurns"></div>
+      <p class="meta" id="mindTurnsMsg" role="status"></p>
+    </section>
+    <section class="card" data-msg="mindBotMsg">
+      <h2><span>A bot's mind</span> <span class="sub">personality, memory, its own model, and a place to talk to it</span></h2>
+      <div class="toolbar">
+        <input id="mindBotName" list="mindBotNames" type="search" autocomplete="off" placeholder="Bot name">
+        <datalist id="mindBotNames"></datalist>
+        <button class="btn small" type="button" id="mindFind">Open</button>
+      </div>
+      <p class="meta" id="mindBotMsg" role="status"></p>
+      <div id="mindBot"><p class="empty">Pick a bot above, or click one that is awake now.</p></div>
+    </section>
+    <section class="card" data-msg="mindAssignMsg">
+      <h2><span>Give bots a personality</span> <span class="sub">by name, in bulk, or open one bot above to write it yourself</span></h2>
+      <div id="mindAssign"></div>
+      <p class="meta" id="mindAssignMsg" role="status"></p>
+    </section>
+    <section class="card" data-msg="mindBankMsg">
+      <h2><span>Line bank</span> <span class="sub">prewritten chat lines: bots sound alive without a model call each time</span></h2>
+      <div id="mindBank"></div>
+      <p class="meta" id="mindBankMsg" role="status"></p>
+    </section>
+    <section class="card" data-msg="mindCastMsg">
+      <h2><span>The regulars</span> <span class="sub">the bots you keep seeing: they start most of the talk, have friends and remember you</span></h2>
+      <div id="mindCast"></div>
+      <p class="meta" id="mindCastMsg" role="status"></p>
+    </section>
+    <section class="card" data-msg="mindSettingsMsg">
+      <h2><span>Behaviour and safety</span> <span class="sub">applies to every bot, at once</span></h2>
+      <div id="mindSettings"></div>
+      <div class="settings-actions">
+        <button class="btn" type="button" id="mindExport">Export personalities</button>
+        <button class="btn" type="button" id="mindExportFull">Export everything (with memories)</button>
+        <button class="btn" type="button" id="mindRerollAll" title="Every automatically made personality is thrown away and made again the next time that bot speaks. Ones you wrote or edited are kept.">Re-roll all generated personalities</button>
+        <button class="btn" type="button" id="mindImport">Import a file</button>
+        <input type="file" id="mindImportFile" accept="application/json,.json" hidden>
+      </div>
+      <p class="meta" id="mindSettingsMsg" role="status"></p>
+    </section>
+  </main>
+  <!-- private:end -->
+
+  <!-- private:start -->
   <main class="page" data-page="settings" hidden>
     <section class="card">
       <h2><span data-i18n="settingsTitle"></span> <span class="sub" id="settingsSub"></span></h2>
@@ -201,7 +292,9 @@
 </div>
 
 <dialog id="sheet"><div class="sheet" id="sheetBody"></div></dialog>
+<!-- private:start --><dialog id="mindSheet" class="mind-sheet"><div class="sheet" id="mindSheetBody"></div></dialog><!-- private:end -->
 
 <script src="static/dashboard.js"></script>
+<!-- private:start --><script src="static/minds.js"></script><!-- private:end -->
 </body>
 </html>
