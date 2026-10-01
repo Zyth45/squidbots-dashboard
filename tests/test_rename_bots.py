@@ -97,6 +97,20 @@ class RenameTests(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertFalse([s for s in statements if "UPDATE" in s])
 
+    def test_a_big_rename_goes_to_mysql_on_stdin_not_as_one_huge_argument(self):
+        calls = []
+
+        def fake_run(command, **kwargs):
+            calls.append((command, kwargs))
+            return mock.Mock(returncode=0, stdout="", stderr="")
+        sql = "; ".join("UPDATE characters SET name = 'x' WHERE guid = %d" % n for n in range(5000))
+        with mock.patch.object(rename_bots.subprocess, "run", fake_run):
+            rename_bots.mysql(arguments(), sql)
+        command, kwargs = calls[0]
+        self.assertNotIn("-e", command)
+        self.assertEqual(kwargs["input"], sql)
+        self.assertLess(sum(len(part) for part in command), 1000)
+
     def test_the_minds_database_follows_the_new_names(self):
         directory = tempfile.mkdtemp()
         path = os.path.join(directory, "mind.sqlite")

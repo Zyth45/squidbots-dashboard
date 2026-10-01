@@ -39,8 +39,9 @@ GENDERS = {0: "male", 1: "female"}
 
 def mysql(args, sql, write=False):
     """The rows (tab separated, one list per row) the statement returns."""
-    command = ["mysql", "--defaults-file=" + args.defaults_file, "--batch", "--skip-column-names", "-e", sql]
-    done = subprocess.run(command, capture_output=True, text=True, timeout=300)
+    # The statement goes in on stdin: a rename of a thousand bots is far past the length of one command-line argument.
+    command = ["mysql", "--defaults-file=" + args.defaults_file, "--batch", "--skip-column-names"]
+    done = subprocess.run(command, input=sql, capture_output=True, text=True, timeout=300)
     if done.returncode != 0:
         raise RuntimeError("mysql failed: %s" % done.stderr.strip())
     return [line.split("\t") for line in done.stdout.splitlines() if line]
