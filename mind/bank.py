@@ -483,7 +483,7 @@ def parse_lines(text, situation):
         if re.search(r"\b(as an ai|language model|i am a bot|i'm a bot)\b", line, re.I):
             continue
         if roleplay and (rp_bank.META.search(PLACEHOLDER.sub("", line)) or "level" in PLACEHOLDER.findall(line)
-                         or rp_bank.SELF_GENDERED.search(line)):
+                         or rp_bank.SELF_GENDERED.search(line) or rp_bank.ANACHRONISM.search(line)):
             continue      # a person in the world does not talk about levels, servers or bots, and any gender may say the line
         found = PLACEHOLDER.findall(line)
         if "link" not in found and OBJECTIVE.search(line):

@@ -498,6 +498,11 @@ class BankTests(unittest.TestCase):
         self.assertEqual(bank_module.parse_lines(json.dumps([long_line]), "rp_idle_work"), [long_line])
         self.assertNotEqual(bank_module.parse_lines(json.dumps([long_line]), "idle_general"), [long_line])
 
+    def test_lines_from_after_the_age_of_the_lich_king_are_dropped(self):
+        lines = bank_module.parse_lines(json.dumps(["The Bronze Dragonflight keeps the Caverns of Time.", "I once crossed Pandaria on foot.",
+                                                    "Garrosh would not have blinked."]), "rp_idle_muse")
+        self.assertEqual(lines, ["The Bronze Dragonflight keeps the Caverns of Time."])
+
     def test_a_combat_shout_must_name_the_foe_once_and_claim_no_role(self):
         lines = bank_module.parse_lines(json.dumps(["Strike {mob} down!", "I will heal through {mob}", "Hold the line", "{mob} {mob}"]), "rp_combat_focus")
         self.assertEqual(lines, ["Strike {mob} down!"])

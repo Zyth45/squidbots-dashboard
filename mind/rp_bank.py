@@ -92,6 +92,11 @@ SELF_ONLY = {"rp_idle_loot", "rp_idle_stronger"}
 META = re.compile(r"\b(levels?|level-up|xp|servers?|mmo|npcs?|dungeon finder|dps|aggro|cooldowns?|respawn\w*|nerf\w*|patch\w*|laggy?|"
                   r"afk|brb|lol|lmao|rofl|gg|wts|wtb|lfg|lfm|ooc|irl|bots?|ai|ping|fps|hitbox|spawn\w*|mobs?|gear score)\b", re.I)
 
+# Places, peoples and events from after the age of the Lich King: nobody in this world has heard of them, and a model that knows the later game
+# leaks them now and then.
+ANACHRONISM = re.compile(r"\b(pandaria|pandaren|garrosh|cataclysm|shadowlands|maldraxxus|revendreth|ardenweald|boralus|azerite|dracthyr|evokers?|"
+                         r"dragon isles|nazjatar|zuldazar|warlords of draenor|mists of pandaria|battle for azeroth|dragonflight expansion)\b", re.I)
+
 # An action about oneself ("*tightens her cloak*") would be wrong half the time: the same line is said by men and women.
 SELF_GENDERED = re.compile(r"\*[^*]*\b(?:she|he|her|his|hers|him|herself|himself)\b[^*]*\*", re.I)
 

@@ -876,7 +876,7 @@ class Ambient:
         raw = ((answer.get("choices") or [{}])[0].get("message") or {}).get("content") or ""
         text = filters.clean(raw, RP_CUT_CHARS, filters.blocked_list(store.setting("blocked_words")), ident.bot_name,
                              whole_thought=True).strip().strip('"“”').strip()
-        if not text or SILENT.match(text) or rp_bank.META.search(text):
+        if not text or SILENT.match(text) or rp_bank.META.search(text) or rp_bank.ANACHRONISM.search(text):
             gateway._log_turn(turn, dict(meta, reply=text or "(silent)", tool_calls="", ok=1), force=True)
             return None
         self.hear(key, ident.bot_name or "?", text)
