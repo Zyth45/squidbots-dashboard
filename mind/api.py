@@ -69,7 +69,8 @@ class Api:
         age = time.time() - beat.get("at", 0)
         return {"running": age < SERVICE_FRESH_S, "age": round(age), "port": beat.get("port"),
                 "pid": beat.get("pid"), "inflight": beat.get("inflight", 0), "keys": beat.get("keys", {}),
-                "noPlayer": beat.get("noPlayer", 0), "jev": beat.get("jev") or {},
+                "noPlayer": beat.get("noPlayer", 0), "plainChats": beat.get("plainChats", 0), "roleplayRetries": beat.get("roleplayRetries", 0),
+                "jev": beat.get("jev") or {},
                 "started": beat.get("started")}
 
     def overview(self):
@@ -127,7 +128,7 @@ class Api:
         character = self.store.rp_character(guid)
         if not character:
             return None
-        return {"character": character, "chapters": self.store.rp_chapters(guid),
+        return {"character": character, "chapters": self.store.rp_chapters(guid), "events": self.store.rp_events(guid, 12),
                 "calling": rp_module.calling_label(character["race"], character["calling"])}
 
     def cards(self):
@@ -209,7 +210,7 @@ class Api:
         return {"character": character, "chapters": self.store.rp_chapters(guid),
                 "archetype": rp_module.archetype_of(character),
                 "calling": rp_module.calling_label(character["race"], character["calling"]),
-                "memories": self.store.memories(guid, limit=50), "relationships": self.store.relationships(guid)}
+                "events": self.store.rp_events(guid, 20), "memories": self.store.memories(guid, limit=50), "relationships": self.store.relationships(guid)}
 
     # ---- writes --------------------------------------------------------------------------------------
 
@@ -692,7 +693,7 @@ class Api:
         self.store.note_seen(guid, found[0], found[1])
         return {"ok": True}
 
-    SETTING_KINDS = {"auto_persona": "flag", "guard": "flag", "log_turns": "flag", "paused": "flag",
+    SETTING_KINDS = {"auto_persona": "flag", "plain_chat_no_tools": "flag", "guard": "flag", "log_turns": "flag", "paused": "flag",
                      "style_rules": ("text", 600), "blocked_words": ("text", 300), "personality_mix": ("text", 600),
                      "ambient_vibe": ("text", 900), "chat_mode": ("choice", rp_module.MODES), "rp_channels": ("text", 80),
                      "rp_rules": ("text", 2400), "rp_bank_share_player": ("int", 0, 100), "rp_start_llm": ("int", 0, 100),

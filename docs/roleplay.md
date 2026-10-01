@@ -49,9 +49,11 @@ Warcraft's established peoples and places, not canon; edit the table to change t
 ## What the model is shown
 
 Every time a bot speaks, the model gets one system prompt (`mind/rp.py`, `persona_block`): who the bot is; its people's history,
-beliefs, view of the other peoples and enemies; its story so far; and **right now**: the zone and its lore (`mind/lore.py` holds 70
-zones), the area, what it is doing, the errands in its log (told as tasks and commissions, never as "quests"), and how seasoned it is
-for its level, so a level-5 does not talk like a level-75. Then the rules (editable on the page): stay in character, never mention
+beliefs, view of the other peoples and enemies; its story so far; a few lines of its own bank as examples of how it sounds; and **right now**:
+the zone and its lore (`mind/lore.py` holds 70 zones), the area, what it is doing, the time of day and any holiday being kept (Brewfest is
+on right now on the test realm), the errands in its log (told as tasks and commissions, never as "quests", each with a one-line description
+a model wrote once from the quest's own aim), what has happened to it lately (below), and how seasoned it is for its level, so a level-5
+does not talk like a level-75. Then the rules (editable on the page): stay in character, never mention
 levels, servers or the game, know only what someone of this age and place would know, be vague rather than invent a fact, answer
 out-of-character `(( ))` briefly and then go back to the scene, but only when the other person writes `(( ))` or `ooc` first: an odd question ("are you an AI?") is put to the person being played and answered in character.
 
@@ -72,6 +74,67 @@ Short remarks use a compact version of the prompt, so a line costs about as much
   `/say`, `/yell` and guild it is said in the character's own words.
 - The regulars (the cast) still start most of the talk. Their friendships are written in the world's own terms (old comrades, a shared
   oath, mentor and student), only between members of the same side.
+
+## A life that follows what happened
+
+The module keeps a small journal of every bot: level-ups, a new zone, a finished errand, a fall in battle, a dungeon boss or a notorious foe
+brought down, a rare find. It goes to the service with the bot's context, which keeps it (`rp_event`) and shows the last few to the model as
+"what has happened to you lately". When a bot enters a new stretch of life the chapter it has just finished is **rewritten around what really
+happened in it** (two or more events), so the story is the bot's own and not a template. Times are in the world's terms: no numbers, no
+levels.
+
+## Presence
+
+Things the module does so that a bot is a person in the world and not a chat source (`docs/roleplay.md` in synthiqbots has the keys):
+
+- **Companions.** A bot in a party with a whitelisted player remarks on a moment of the road in party chat: a new zone, a great foe down, a
+  fall, a rare find, a new stretch of its life, now and then an idle thought on a quiet road. Written by the model (`mode: companion`), at
+  most one remark per party per 75 s.
+- **Greetings.** A bot that knows a player says hello when they walk up to it (`welcome` with `proximity`); strangers are mostly ignored.
+- **Emotes.** A bow, wave, thank or laugh aimed at a bot (or near one) is answered with an emote back and, often, a line from the bank (free).
+- **The people of the world.** An innkeeper, guard, trainer, vendor or flight master near a whitelisted player answers in character when
+  spoken to in `/say`: with them selected, or by name or title (`mode: npc`). They are civil to your side and curt to the other, know the
+  zone's lore, and remember the last few lines of the talk. Real innkeepers answer with a warm bed "by the hearth at Tarren Mill".
+- **Sides.** The two factions cannot read each other (the game shows gibberish), so a character does not answer the other side, and
+  speaks up in `/say` only for those who can understand it, unless the realm allows two-side chat.
+- **Quicker speech.** A character talks, it does not type: shorter pauses before and while it answers, and a thinking gesture when it is
+  spoken to by name.
+- **Bots do not stay on one subject for ever.** After six lines in a row about the same thing, with no player in the talk, it is let go.
+
+## Responsiveness
+
+Measured on the test realm, whispers to a roleplaying bot:
+
+| | before | now |
+|---|---|---|
+| prompt per whisper | 6,700 tokens | about 3,000 |
+| cost per whisper | $0.00024 to $0.00046 | $0.0001 |
+| model time | 1.5 to 1.9 s | about the same: the model's own time |
+
+What changed: a whisper that asks nothing of the bot (no invite, follow, trade, gear and the like) is answered **without the tool list**, which was
+most of the prompt (14 tools, about 5,000 tokens); anything that could be a request keeps the tools (`plain_chat_no_tools`). The prompt is
+ordered for the provider's cache, which keeps everything but the last message: the sheet and the module's own text come first and stay
+identical from turn to turn, and what changes (the module's state snapshot, where the bot is, what it remembers of this player) is put in
+front of the player's words in the last message. Cached input is a tenth of the price: **cached tokens went from 0 to about 80% of the prompt**.
+A reply that slips out of the world ("level 50", a later-game name) is said again once, in character, unless the player asked for it out of
+character. The service's heartbeat counts both (`plainChats`, `roleplayRetries`).
+
+### Which model for the ambient lane
+
+`tests/bench_roleplay.py` replays 48 situations (six characters, eight lines) against candidate models and has a judge score each answer
+(in character, lore, brevity, no player talk, engaging), at about a cent a model:
+
+| model | score /8 | median | p90 | cost per line | slips (of 48) |
+|---|---|---|---|---|---|
+| gpt-6-luna | 7.73 | 1.26 s | 1.56 s | $0.00014 | 4 |
+| gpt-4o-mini | 7.81 | 0.92 s | 1.04 s | $0.00020 | 7 |
+| gpt-5-nano | 7.62 | 1.00 s | 1.30 s | $0.00008 | 3 |
+| gpt-4.1-nano | 7.60 | 0.75 s | 0.91 s | $0.00013 | 5 |
+| gpt-4.1-mini | 7.69 | 0.88 s | 1.00 s | $0.00053 | 4 |
+| **gpt-5.4-nano** | 7.75 | 0.87 s | 1.04 s | $0.00029 | **1** |
+
+The scores are all within the judge's noise, so the choice is speed and slips: the test realm's ambient lane runs on gpt-5.4-nano (a third
+quicker than gpt-6-luna, one slip in 48); conversation stays on gpt-6-luna, which does the tool work.
 
 ## The roleplay line bank
 
@@ -113,7 +176,12 @@ python3 tools/rename_bots.py --defaults-file ~/.config/coa-dev/client.cnf \
 python3 tools/rename_bots.py ... --apply                                                                                    # do it
 ```
 
-Two-word names are left alone by playerbots' own startup rename (`AiPlayerbot.CoaBotSurname` stays on). The cost is that nothing on a
+Two-word names are left alone by playerbots' own startup rename (`AiPlayerbot.CoaBotSurname` stays on). The module calls a bot by its
+first name too ("Elorin, hello"): `Promotion::ShortName` takes the first word of a two-word name, as it took "Alte" from "Alte Bot".
+
+`tools/rename_guilds.py` does the same for guilds a bot leads (dry run unless `--apply`, needs the worldserver stopped, writes a rollback script):
+"Elite Guard" becomes "Stormwind Vanguard" or "Orgrimmar Wolfriders" by the leader's side, with a message of the day and an info text in the
+same voice. The cost is that nothing on a
 nameplate says "bot" any more: that is the point for roleplay, and a reason to leave it undone if you want bots recognisable. Bots made
 later are named from playerbots' own list; run the tool again for them. The same guid always gets the same name.
 
@@ -138,12 +206,15 @@ met so far): every backstory and all 102 chapters written by the model for under
 
 ## Verified
 
-- `python -m unittest discover -s tests -t .` (338 tests, no network; `tests/test_roleplay.py` and `tests/test_rename_bots.py` are the new ones).
-- On the test realm with the roleplay module (`tools/e2e/roleplay_run.py` in synthiqbots, R1 to R6): a whisper is answered by a character
-  with its sheet, race, calling and story shown to the model; the answer names the zone and the sub-area the bot really stands in; "are you
-  an AI?" is answered in character; four minutes among a crowd of bots produced no line in the realm channel or General, and a bot spoke
-  aloud in `/say`.
-- Not tried: the Windows launcher, the Docker stack, a second faction's players, long-running chapters across many level-ups.
+- `python -m unittest discover -s tests -t .` (366 tests, no network; `tests/test_roleplay.py`, `tests/test_rename_bots.py` and
+  `tests/test_rename_guilds.py` are the new ones).
+- On the test realm with the roleplay module (`tools/e2e/roleplay_run.py` in synthiqbots, R1 to R11, all pass): a whisper is answered by a
+  character with its sheet, race, calling and story shown to the model; the answer names the zone and the sub-area the bot really stands in;
+  "are you an AI?" is answered in character; four minutes among a crowd of bots produced no line in the realm channel or General, and a bot
+  spoke aloud in `/say`; a GM level-up reaches the service as a journal event and is shown to the model; a bow is answered with an emote; an
+  innkeeper answers in character; a bot that knows the player greets them on walking up; a grouped bot remarks in party chat.
+- Not tried: the Windows launcher, the Docker stack, a player of the other faction, a multi-day soak, the thinking gesture and the quicker speech
+  pauses (built and deployed, not measured). The weather is not sent: the core keeps a zone's weather state private.
 
 ## Files and endpoints
 

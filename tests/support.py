@@ -118,4 +118,14 @@ class GatewayCase(unittest.TestCase):
         self.store.set_setting("chat_mode", "players")
 
     def system_text(self, request_index=-1):
-        return self.provider.requests[request_index]["body"]["messages"][0]["content"]
+        """Everything the model was told as system messages (the first, and any the service put straight after it), as one text."""
+        messages = self.provider.requests[request_index]["body"]["messages"]
+        out = []
+        for message in messages:
+            if message.get("role") != "system":
+                break
+            out.append(message["content"])
+        last = messages[-1] if messages and messages[-1].get("role") == "user" and isinstance(messages[-1].get("content"), str) else None
+        if last and last["content"].startswith("THIS TURN"):      # what is true this turn is put in front of the player's words
+            out.append(last["content"])
+        return "\n\n".join(out)

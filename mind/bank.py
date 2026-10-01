@@ -489,7 +489,7 @@ def parse_lines(text, situation):
         if "link" not in found and OBJECTIVE.search(line):
             continue
         if situation in link_situations:
-            if found.count("link") != 1:
+            if found.count("link") != 1 or (roleplay and rp_bank.LINK_AS_PLACE.search(line)):
                 continue
         elif "link" in found:
             continue

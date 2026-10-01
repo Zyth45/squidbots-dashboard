@@ -97,6 +97,9 @@ META = re.compile(r"\b(levels?|level-up|xp|servers?|mmo|npcs?|dungeon finder|dps
 ANACHRONISM = re.compile(r"\b(pandaria|pandaren|garrosh|cataclysm|shadowlands|maldraxxus|revendreth|ardenweald|boralus|azerite|dracthyr|evokers?|"
                          r"dragon isles|nazjatar|zuldazar|warlords of draenor|mists of pandaria|battle for azeroth|dragonflight expansion)\b", re.I)
 
+# {link} is a title, not a place: "beneath {link}" was written more than once.
+LINK_AS_PLACE = re.compile(r"\b(?:beneath|under|above|upon|across|through|inside|into|toward|towards|within|behind|over|past)\s+\{link\}", re.I)
+
 # An action about oneself ("*tightens her cloak*") would be wrong half the time: the same line is said by men and women.
 SELF_GENDERED = re.compile(r"\*[^*]*\b(?:she|he|her|his|hers|him|herself|himself)\b[^*]*\*", re.I)
 
@@ -225,7 +228,9 @@ def write_request(archetype, situation, count):
         user = "%s\n\nSITUATION: %s\nCHANNEL: %s" % (_calling_sheet(archetype), wanted_text, channels)
         who = "one kind of character"
         if situation in LINK_SITUATIONS:
-            extra = "Every line must contain {link} exactly once, where you would name it. Never write the thing's name yourself. "
+            extra = ("Every line must contain {link} exactly once, where you would name it. Never write the thing's name yourself. {link} is replaced by "
+                     "a title in brackets, like [Hogger's Plight] or [Linen Cloth], so treat it as a proper noun you are speaking of ('I took on {link}', "
+                     "'for {link}', 'about {link}', 'I found {link}'), never as a place or a surface: not 'beneath {link}', 'under {link}', 'across {link}'. ")
         elif situation in MOB_SITUATIONS:
             extra = ("Every line must contain {mob} exactly once, where you would name the foe. Never write a foe's name yourself. Each is a "
                      "shout of 3 to 9 words in your own voice: urgent, never a question. You do not know what trade you follow in this fight: "

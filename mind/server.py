@@ -147,7 +147,7 @@ def heartbeat_loop(settings, gateway, started):
             write_atomic(settings["statusFile"], json.dumps({
                 "schema": 1, "at": time.time(), "started": started, "pid": os.getpid(),
                 "port": settings["port"], "inflight": gateway.inflight, "keys": gateway.key_states(),
-                "noPlayer": gateway.no_player,
+                "noPlayer": gateway.no_player, "plainChats": gateway.plain_chats, "roleplayRetries": gateway.rp_retries,
                 "jev": {"key": bool(jev.api_key()), "calls": jev.STATS["calls"], "failures": jev.STATS["failures"],
                         "spentUsd": jev.spent_usd(), "paused": not jev.BREAKER.allow()}}))
             gateway.store.prune_call_log()

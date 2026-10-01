@@ -38,6 +38,7 @@
     ]],
     ["Chat and personalities", [
       ["personality_mix", "How common each kind of personality is", "For personalities made automatically, like troll: 3, lurker: 1. A bigger number is more common, 0 removes a kind, a kind left out is never made. Empty uses the built-in mix. Apply it with Re-roll all generated personalities below.", "text"],
+      ["plain_chat_no_tools", "Plain conversation without tools", "A whisper that asks nothing of the bot (no invite, follow, trade or the like) is answered without the tool list, which is most of the prompt: quicker and cheaper. Anything that could be a request keeps them.", "bool"],
       ["max_tool_rounds", "Most tool steps per message", "Stops a bot that keeps calling tools without ever answering. The game module has its own, higher limit.", "int"],
       ["ambient_vibe", "The vibe of public chat", "Told to every bot that answers a hello or says its stock chatter in its own words. Make it politer, ruder, sillier or more roleplay. Empty uses the built-in text (shown in grey).", "text"],
     ]],
@@ -421,7 +422,11 @@
       + '<div class="wide row"><button class="btn primary" type="submit">Save character</button>'
       + '<button class="btn" type="button" id="rpResetStory">Write the story again</button>'
       + '<span class="hint">Saving marks the character as written by you: it is never rewritten behind your back.</span></div></form>'
-      + "<h4>Chapters of their life</h4>" + chapters;
+      + "<h4>Chapters of their life</h4>" + chapters
+      + "<h4>What the game has told us they did</h4>" + (rp.events && rp.events.length
+        ? '<ul class="mind-mem">' + rp.events.map(e => '<li><span class="kind">' + esc(e.kind) + "</span><span>" + esc(e.text)
+          + '<span class="ago">' + ago(e.ts) + (e.zone ? " · " + esc(e.zone) : "") + "</span></span><span></span></li>").join("") + "</ul>"
+        : '<p class="empty">Nothing yet: the game reports level-ups, new zones, finished errands, falls and great finds as they happen.</p>');
   }
 
   function renderSettings(o) {

@@ -11,10 +11,10 @@ CONTEXT = {"race": "Night Elf", "class": "Hunter", "gender": "female", "level": 
            "doing": "walking between errands", "quests": ["The Zoram Strand Report", "Elune's Tear"]}
 
 
-def roleplay_chat(guid=20014, name="Alte Bot", context=None, text="who are you?"):
+def roleplay_chat(guid=20014, name="Alte Bot", context=None, text="who are you?", hp=100):
     request = chat(guid, name, 77, "Ann", text)
-    request["messages"][0]["content"] += "\n[BOT STATE SNAPSHOT]\nname=%s level=34 roleplay_context=%s\n" % (
-        name, json.dumps(context or CONTEXT))
+    request["messages"][0]["content"] += "\n[BOT STATE SNAPSHOT]\nname=%s level=34 hp_pct=%d in_combat=false\nroleplay_context=%s\n" % (
+        name, hp, json.dumps(context or CONTEXT))
     return request
 
 
@@ -114,6 +114,12 @@ class NameTests(unittest.TestCase):
             self.assertNotIn(name.lower(), taken)
             self.assertTrue(re.match(r"^[A-Z][a-z]{1,11}$", name), name)
             taken.add(name.lower())
+
+    def test_generated_first_names_are_short_enough_to_type(self):
+        rng = random.Random(5)
+        taken = {lore_names.clean_name(n).lower() for n in lore_names.NAMES["Human"]["male"]}
+        generated = [lore_names.name_for("Human", "male", taken | {g.lower() for g in []}, rng) for _ in range(60)]
+        self.assertTrue(all(len(name) <= 9 for name in generated), [n for n in generated if len(n) > 9])
 
     def test_it_never_runs_out_of_names(self):
         rng = random.Random(1)
@@ -217,6 +223,77 @@ class SmartLaneTests(RoleplayCase):
         self.assertIsNone(self.store.rp_character(20014))
         self.assertNotIn("YOUR STORY SO FAR", self.system_text())
 
+    def test_a_reply_that_slips_out_of_the_world_is_said_again_once(self):
+        self.provider.answers.extend(["Ha, I reached level 50 on this server!", "Fifty winters of hard roads, friend, and I have the scars to show it."])
+        status, answer = self.gateway.handle("smart", roleplay_chat(text="how seasoned are you?"))
+        self.assertEqual(answer["choices"][0]["message"]["content"], "Fifty winters of hard roads, friend, and I have the scars to show it.")
+        self.assertEqual(len(self.provider.requests), 2)
+        self.assertIn("You slipped", json.dumps(self.provider.requests[1]["body"]))
+        self.assertEqual(self.gateway.rp_retries, 1)
+
+    def test_a_second_slip_is_sent_as_it_is_and_out_of_character_is_allowed_when_asked_for(self):
+        self.provider.answers.extend(["Level 50, I swear.", "Still level 50."])
+        status, answer = self.gateway.handle("smart", roleplay_chat(text="how seasoned are you?"))
+        self.assertEqual(answer["choices"][0]["message"]["content"], "Level 50, I swear.")
+        self.provider.answers.append("((I am level 50 in game terms.))")
+        before = len(self.provider.requests)
+        self.gateway.handle("smart", roleplay_chat(text="ooc: what level are you?"))
+        self.assertEqual(len(self.provider.requests), before + 1)
+
+    def test_a_roleplaying_whisper_with_no_request_in_it_is_answered_without_the_tools(self):
+        request = roleplay_chat(text="who are you, and where do you hail from?")
+        request["tools"] = [{"type": "function", "function": {"name": "core", "parameters": {"type": "object"}}}]
+        self.provider.answers.append("Well met.")
+        self.gateway.handle("smart", request)
+        self.assertNotIn("tools", self.provider.requests[-1]["body"])      # the sheet and the errands it mentions must not count as asking for something
+        request = roleplay_chat(text="please follow me")
+        request["tools"] = [{"type": "function", "function": {"name": "core", "parameters": {"type": "object"}}}]
+        self.provider.answers.append("Lead on.")
+        self.gateway.handle("smart", request)
+        self.assertIn("tools", self.provider.requests[-1]["body"])
+
+    def test_the_first_system_message_is_the_same_every_turn_so_a_provider_can_cache_it(self):
+        self.provider.answers.extend(["Well met.", "Again."])
+        self.gateway.handle("smart", roleplay_chat(text="who are you?"))
+        self.store.add_memory(20014, 77, "Ann", "fact", "Ann likes red wine", 0.9)
+        self.store.note_seen(20014, 77, "Ann")
+        events = [{"k": "zone", "t": "arrived in Ashenvale", "ago": 5000}]
+        context = dict(CONTEXT, events=events)
+        self.gateway.handle("smart", roleplay_chat(text="who are you?", context=context, hp=63))
+        first = [r["body"]["messages"][0] for r in self.provider.requests]
+        self.assertEqual(first[0], first[1])
+        self.assertNotIn("roleplay_context", first[0]["content"])
+        later = self.provider.requests[1]["body"]["messages"][-1]
+        self.assertEqual(later["role"], "user")
+        self.assertTrue(later["content"].startswith("THIS TURN"))
+        self.assertTrue(later["content"].endswith("who are you?"))
+        self.assertIn("RIGHT NOW", later["content"])
+        self.assertIn("Ann likes red wine", later["content"])
+        self.assertIn("hp_pct=63", later["content"])               # the snapshot moved to the player's message with everything else that changes
+        self.assertNotIn("hp_pct", first[0]["content"])
+        self.assertIn("ACTIVE WoW SESSION", first[0]["content"])
+
+    def test_the_stable_part_of_the_prompt_comes_first_and_what_is_true_now_comes_last(self):
+        self.provider.answers.append("Well met.")
+        self.gateway.handle("smart", roleplay_chat())
+        system = self.system_text()
+        self.assertLess(system.index("YOUR STORY SO FAR"), system.index("ACTIVE WoW SESSION"))
+        self.assertGreater(system.index("RIGHT NOW"), system.index("ACTIVE WoW SESSION"))
+        self.assertIn("The Zoram Strand Report", system[system.index("RIGHT NOW"):])
+
+    def test_a_character_is_shown_its_own_bank_lines_as_its_voice_and_always_the_same_ones(self):
+        persona = self.gateway.rp.character(20014, "Alte Bot", rp.clean_context(CONTEXT))
+        for situation in ("rp_idle_muse", "rp_reply_banter", "rp_idle_creed", "rp_idle_humor"):
+            self.gateway.bank.add_lines(persona["archetype"], situation, ["%s line %d, friend." % (situation, n) for n in range(10)])
+        first = self.gateway.rp.voice_samples(persona)
+        self.assertEqual(len(first), 4)
+        self.gateway.rp.voices.clear()
+        self.assertEqual(self.gateway.rp.voice_samples(persona), first)
+        self.provider.answers.append("Well met.")
+        self.gateway.handle("smart", roleplay_chat())
+        self.assertIn("HOW YOU SOUND", self.system_text())
+        self.assertIn(first[0], self.system_text())
+
     def test_players_mode_keeps_the_old_behaviour_exactly(self):
         self.store.set_setting("chat_mode", "players")
         self.provider.answers.append("hey")
@@ -258,9 +335,51 @@ class SmartLaneTests(RoleplayCase):
 
 
 class StoryTests(RoleplayCase):
-    def make(self, level):
-        ctx = dict(CONTEXT, level=level)
+    def make(self, level, **more):
+        ctx = dict(CONTEXT, level=level, quests=[])
+        ctx.update(more)
         return self.gateway.rp.character(20014, "Alte Bot", rp.clean_context(ctx))
+
+    def test_the_events_the_game_reports_are_kept_shown_and_deduplicated(self):
+        self.make(34, events=[{"k": "death", "t": "was struck down by a Venom Web Spider", "ago": 120},
+                              {"k": "boss", "t": "helped kill Hogger", "ago": 4000}])
+        self.make(34, events=[{"k": "death", "t": "was struck down by a Venom Web Spider", "ago": 60}])      # the same one again
+        events = self.store.rp_events(20014)
+        self.assertEqual(sorted(e["kind"] for e in events), ["boss", "death"])
+        persona = self.gateway.rp.character(20014, "Alte Bot", rp.clean_context(dict(CONTEXT, level=34, quests=[])))
+        stable, now = self.gateway.rp.block_parts(persona, {}, "RULES")
+        self.assertIn("What has happened to you lately", now)
+        self.assertIn("helped kill Hogger", now)
+        self.assertIn("67 minutes ago", now)
+
+    def test_errands_are_described_once_and_the_description_is_shown(self):
+        self.store.set_setting("rp_ai_story", "1")
+        self.gateway.rp.background = False
+        self.provider.answers.extend(["Sentinels at the coast want a report of the naga's movements carried back before the next moon."] * 8)
+        ctx = dict(CONTEXT, level=34, quests=[{"title": "The Zoram Strand Report", "goal": "Report on the naga at Zoram Strand"}])
+        self.gateway.rp.character(20014, "Alte Bot", rp.clean_context(ctx))
+        flavors = self.store.quest_flavor(["The Zoram Strand Report"])
+        self.assertIn("naga", flavors["The Zoram Strand Report"])
+        before = len(self.provider.requests)
+        self.gateway.rp.character(20014, "Alte Bot", rp.clean_context(ctx))            # known now: no second call for it
+        self.assertEqual([r for r in self.provider.requests[before:] if "Errand:" in json.dumps(r["body"])], [])
+        persona = self.gateway.rp.character(20014, "Alte Bot", rp.clean_context(ctx))
+        stable, now = self.gateway.rp.block_parts(persona, rp.clean_context(ctx), "RULES")
+        self.assertIn("The Zoram Strand Report (Sentinels at the coast", now)
+
+    def test_a_stretch_of_life_that_has_ended_is_rewritten_around_what_really_happened_in_it(self):
+        self.store.set_setting("rp_ai_story", "1")
+        self.gateway.rp.background = False
+        self.make(15, events=[{"k": "death", "t": "fell at the Tidecaller's ford and was raised by a priest", "ago": 300},
+                              {"k": "quest", "t": "carried a warning to Auberdine", "ago": 100}])
+        self.store.add_rp_events(20014, [(time.time() - 50, "boss", "helped kill Foreman Cozzle", 8, "Teldrassil")])
+        self.provider.answers.extend(["At the Tidecaller's ford you fell and a priest brought you back, and you carried the warning to Auberdine the same night, shaken."] * 3)
+        self.make(22)
+        chapters = {c["bracket"]: c for c in self.store.rp_chapters(20014)}
+        self.assertEqual(chapters[1]["source"], "ai")
+        self.assertIn("ford", chapters[1]["text"])
+        recap = [r for r in self.provider.requests if "WHAT REALLY HAPPENED" in json.dumps(r["body"])]
+        self.assertTrue(recap)
 
     def test_a_bot_at_level_34_has_chapters_for_every_stretch_of_its_life_so_far(self):
         self.make(34)
@@ -441,6 +560,78 @@ class AmbientRoleplayTests(RoleplayCase):
         self.assertEqual(answer["text"], "Strike down Defias Conjurer!")
 
 
+class PresenceTests(RoleplayCase):
+    """Modes the game asks for besides answering a line: a companion's remark, an emote's answer, a person of the world, a greeting."""
+
+    def make_bot(self):
+        return self.gateway.rp.character(20014, "Alte Bot", rp.clean_context(CONTEXT))
+
+    def test_a_companion_remarks_on_the_moment_in_its_own_voice(self):
+        self.provider.answers.append("*pulls her hood up* Ashenvale at dusk. Keep close, friends, the satyrs favour this hour.")
+        answer = self.gateway.ambient.handle({"mode": "companion", "event": "zone", "detail": "Ashenvale", "bot_guid": 20014, "bot_name": "Alte Bot",
+                                              "companions": ["Ann"], "zone": "Ashenvale", **{k: v for k, v in CONTEXT.items() if k != "zone"}})
+        self.assertIn("satyrs", answer["text"])
+        system = self.system_text(0)
+        self.assertIn("ON THE ROAD WITH Ann", system)
+        self.assertIn("just come into Ashenvale", system)
+
+    def test_a_companion_that_slips_or_has_nothing_to_say_says_nothing(self):
+        for reply in ("I just hit level 40 lol", "(silent)"):
+            self.provider.answers.append(reply)
+            answer = self.gateway.ambient.handle({"mode": "companion", "event": "levelup", "bot_guid": 20014, "bot_name": "Alte Bot", **CONTEXT})
+            self.assertEqual(answer["text"], "")
+        self.assertEqual(self.gateway.ambient.handle({"mode": "companion", "event": "nonsense", "bot_guid": 20014})["text"], "")
+
+    def test_an_emote_is_answered_with_a_line_from_the_bank_and_costs_nothing(self):
+        character = self.make_bot()
+        self.gateway.bank.add_lines(character["archetype"], "rp_reply_greeting", ["Well met, {player}. Elune light your road."])
+        answer = self.gateway.ambient.handle({"mode": "emote", "emote": "bow", "player_name": "Ann", "bot_guid": 20014, "bot_name": "Alte Bot", **CONTEXT})
+        self.assertEqual(answer["text"], "Well met, Ann. Elune light your road.")
+        self.assertEqual(self.provider.requests, [])
+        self.assertEqual(self.gateway.ambient.handle({"mode": "emote", "emote": "dance", "bot_guid": 20014})["text"], "")
+
+    def test_a_person_of_the_world_answers_in_character_and_remembers_the_talk(self):
+        self.provider.answers.extend(["Aye, a bed is two silver and the stew is hot, friend.", "Upstairs, the second door. Mind the squeaky stair."])
+        ask = {"mode": "npc", "npc_name": "Innkeeper Farley", "npc_title": "Innkeeper", "zone": "Elwynn Forest", "area": "Goldshire",
+               "faction": "Alliance", "player_faction": "Alliance", "player_name": "Ann", "player_guid": 77, "player_race": "Human"}
+        first = self.gateway.ambient.handle(dict(ask, message="Do you have a room?"))
+        self.assertIn("two silver", first["text"])
+        system = self.system_text(0)
+        self.assertIn("You keep an inn", system)
+        self.assertIn("Goldshire", system)
+        self.assertIn("one of your own side", system)
+        self.gateway.ambient.handle(dict(ask, message="Which room?"))
+        self.assertIn("[Ann] Do you have a room?", self.provider.requests[-1]["body"]["messages"][1]["content"])
+
+    def test_a_person_of_the_world_is_curt_with_the_other_side_and_never_talks_like_a_player(self):
+        self.provider.answers.extend(["Keep walking, Horde, my patience is thin.", "You hit level 20 yet?"])
+        ask = {"mode": "npc", "npc_name": "Guard Thomas", "npc_title": "", "zone": "Elwynn Forest", "attitude": "hostile",
+               "player_name": "Gor", "player_guid": 78, "message": "Hello"}
+        self.assertIn("Keep walking", self.gateway.ambient.handle(ask)["text"])
+        self.assertIn("curt, wary and unfriendly", self.system_text(0))
+        self.assertEqual(self.gateway.ambient.handle(dict(ask, message="Anything new?"))["text"], "")
+
+    def test_a_player_walking_up_is_greeted_by_a_bot_that_knows_them_and_not_by_a_stranger(self):
+        self.make_bot()
+        near = {"mode": "welcome", "proximity": True, "bot_guid": 20014, "bot_name": "Alte Bot", "player_guid": 77, "player_name": "Ann",
+                "channel": "say", **CONTEXT}
+        self.gateway.ambient.rng = lambda: 0.5                                     # the dice say: no hail for a stranger
+        self.assertEqual(self.gateway.ambient.handle(near)["text"], "")
+        self.assertEqual(self.provider.requests, [])
+        self.store.note_seen(20014, 77, "Ann")
+        self.provider.answers.append("Ann! Back from the coast already? Elune keep you.")
+        answer = self.gateway.ambient.handle(near)
+        self.assertIn("Ann!", answer["text"])
+        self.assertIn("A FAMILIAR FACE ON THE ROAD", self.system_text(0))
+
+    def test_bots_do_not_stay_on_one_subject_for_ever(self):
+        ambient_ = self.gateway.ambient
+        ambient_.rng = lambda: 0.5
+        topics = [ambient_._topic_here("0:1:guild", ["An oath is only as strong as the one who swears it"], True) for _ in range(9)]
+        self.assertEqual(topics[:6], ["honor"] * 6)
+        self.assertEqual(topics[6], "")
+
+
 class CastTests(RoleplayCase):
     def test_the_mode_the_game_follows(self):
         answer = self.gateway.community.command({"op": "mode"})
@@ -502,6 +693,11 @@ class BankTests(unittest.TestCase):
         lines = bank_module.parse_lines(json.dumps(["The Bronze Dragonflight keeps the Caverns of Time.", "I once crossed Pandaria on foot.",
                                                     "Garrosh would not have blinked."]), "rp_idle_muse")
         self.assertEqual(lines, ["The Bronze Dragonflight keeps the Caverns of Time."])
+
+    def test_a_link_is_a_title_and_never_a_place(self):
+        lines = bank_module.parse_lines(json.dumps(["I took on {link}, and I mean to finish it.", "The watch takes us east beneath {link}.",
+                                                    "Word came for {link} at dusk."]), "rp_idle_quest")
+        self.assertEqual(lines, ["I took on {link}, and I mean to finish it.", "Word came for {link} at dusk."])
 
     def test_a_combat_shout_must_name_the_foe_once_and_claim_no_role(self):
         lines = bank_module.parse_lines(json.dumps(["Strike {mob} down!", "I will heal through {mob}", "Hold the line", "{mob} {mob}"]), "rp_combat_focus")

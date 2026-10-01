@@ -16,8 +16,9 @@ import queue
 import random
 import re
 import threading
+import time
 
-from . import lore, lore_names
+from . import lore, lore_names, rp_bank
 
 MODES = ("roleplay", "players")
 CHANNEL_KINDS = ("say", "yell", "zone", "trade", "lfg", "world", "guild")
@@ -172,9 +173,36 @@ def clean_context(raw):
     for key in ("zone", "area", "doing"):
         if raw.get(key):
             ctx[key] = _clip(raw[key], 60)
-    quests = raw.get("quests")
+    quests, goals = raw.get("quests"), {}
     if isinstance(quests, list):
-        ctx["quests"] = [_clip(q, 70) for q in quests[:5] if _clip(q, 70)]
+        titles = []
+        for quest in quests[:5]:
+            title = _clip(quest.get("title") if isinstance(quest, dict) else quest, 70)
+            if title:
+                titles.append(title)
+                if isinstance(quest, dict) and quest.get("goal"):
+                    goals[title] = _clip(quest["goal"], 140)
+        ctx["quests"] = titles
+        if goals:
+            ctx["quest_goals"] = goals
+    events = raw.get("events")
+    if isinstance(events, list):
+        kept = []
+        for event in events[:10]:
+            if isinstance(event, dict) and _clip(event.get("t") or event.get("text"), 100):
+                try:
+                    ago = max(0, int(event.get("ago") or 0))
+                except (TypeError, ValueError):
+                    ago = 0
+                kept.append({"kind": _clip(event.get("k") or event.get("kind") or "event", 12), "text": _clip(event.get("t") or event.get("text"), 100), "ago": ago})
+        if kept:
+            ctx["events"] = kept
+    for key in ("time", "weather"):
+        if raw.get(key):
+            ctx[key] = _clip(raw[key], 20)
+    holidays = raw.get("holidays")
+    if isinstance(holidays, list):
+        ctx["holidays"] = [_clip(h, 40) for h in holidays[:3] if _clip(h, 40)]
     if raw.get("zone_id") and not ctx.get("zone"):
         ctx["zone"] = lore.ZONE_IDS.get(int(raw["zone_id"]), "") if str(raw["zone_id"]).isdigit() else ""
     if not ctx.get("klass") and str(raw.get("class_id") or "").isdigit():
@@ -317,7 +345,16 @@ def story_request(character):
             "max_tokens": 600}
 
 
-def chapter_request(character, bracket, previous, zones):
+def quest_request(title, goal):
+    system = ("You describe one errand in the world of Warcraft (the age of the Lich King) in the world's own terms, in one or two plain sentences under "
+              "200 characters: who is likely to ask for it, what is to be done and why it matters to the people around. Never say 'quest', 'objective', "
+              "'level', 'XP' or anything about a game. Use only what the title and the aim tell you, and stay vague about details they do not give.")
+    return {"messages": [{"role": "system", "content": system},
+                         {"role": "user", "content": "Errand: %s\nAim, as the game words it: %s" % (title, goal or "(not given)")}],
+            "temperature": 0.5, "max_tokens": 120}
+
+
+def chapter_request(character, bracket, previous, zones, events=()):
     low, high = lore.LEVEL_BRACKETS[bracket]
     where = "; ".join(lore.zone_text(zone) or zone for zone in zones)
     system = ("You write one chapter of the life of a fictional person in the world of Warcraft, in the age of the Lich King. Write in the "
@@ -330,13 +367,16 @@ def chapter_request(character, bracket, previous, zones):
              7: "a champion of their people, now in Northrend"}[bracket]
     user = "%s\n\nTHEIR STORY SO FAR:\n%s\n\nTHIS STRETCH OF LIFE (they are %s, roughly ages of %d to %d of their adventuring):\n%s" % (
         sheet(character), "\n".join(previous) or "(nothing yet: this is the first chapter)", stage, low, high, where or "the road")
+    if events:
+        user += ("\n\nWHAT REALLY HAPPENED TO THEM in this stretch (build the chapter around the most telling of these, in the world's terms, and "
+                 "invent nothing that contradicts them):\n" + "\n".join("- %s%s" % (e["text"], (" (in %s)" % e["zone"]) if e.get("zone") else "") for e in events))
     return {"messages": [{"role": "system", "content": system}, {"role": "user", "content": user}], "temperature": 0.9, "max_tokens": 300}
 
 
-def usable_text(text, limit):
+def usable_text(text, limit, minimum=40):
     """A model's paragraph that may become part of a person's story: whole, in the world, within the limit. Otherwise ''."""
     text = " ".join(str(text or "").split()).strip().strip('"')
-    if len(text) < 40 or NOT_IN_WORLD.search(text):
+    if len(text) < minimum or NOT_IN_WORLD.search(text) or rp_bank.ANACHRONISM.search(text):
         return ""
     if len(text) > limit:
         head = text[:limit]
@@ -370,7 +410,17 @@ def story_text(character, chapters, compact=False):
     return "\n".join(parts)
 
 
-def now_text(character, ctx, level_known=True):
+def ago_text(seconds):
+    if seconds < 90:
+        return "a moment ago"
+    if seconds < 5400:
+        return "%d minutes ago" % round(seconds / 60)
+    if seconds < 172800:
+        return "%d hours ago" % round(seconds / 3600)
+    return "%d days ago" % round(seconds / 86400)
+
+
+def now_text(character, ctx, level_known=True, events=(), flavors=None):
     lines = []
     level = ctx.get("level") or character.get("level") or 0
     if level and level_known:
@@ -381,17 +431,39 @@ def now_text(character, ctx, level_known=True):
         lines.append("You are in %s" % text)
     elif zone:
         lines.append("You are in %s%s." % (zone, (", near " + ctx["area"]) if ctx.get("area") and ctx["area"] != zone else ""))
+    air = [part for part in (("it is %s" % ctx["time"]) if ctx.get("time") else "", ("the weather is %s" % ctx["weather"]) if ctx.get("weather") else "") if part]
+    if air:
+        lines.append("Around you %s." % ", and ".join(air))
+    if ctx.get("holidays"):
+        lines.append("The people about you are keeping %s." % " and ".join(ctx["holidays"]))
     if ctx.get("doing"):
         lines.append("Right now you are %s." % ctx["doing"])
     if ctx.get("quests"):
+        flavors = flavors or {}
+        goals = ctx.get("quest_goals") or {}
+        described = ["%s%s" % (title, (" (" + (flavors.get(title) or goals.get(title)) + ")") if (flavors.get(title) or goals.get(title)) else "")
+                     for title in ctx["quests"]]
         lines.append("The errands you have taken on, in your own life (speak of them as tasks, commissions or duties, never as 'quests'): %s."
-                     % "; ".join(ctx["quests"]))
+                     % "; ".join(described))
+    recent = list(events) or [{"text": e["text"], "ago": e["ago"]} for e in ctx.get("events") or []]
+    if recent:
+        lines.append("What has happened to you lately (you may bring it up when it fits, never as a list): %s."
+                     % "; ".join("%s (%s)" % (e["text"], ago_text(int(e.get("ago") if "ago" in e else max(0, time.time() - e["ts"])))) for e in recent[:5]))
     return "\n".join(lines)
 
 
-def persona_block(character, ctx, chapters, rules, guard="", actions=True, compact=False, typing="", action_rule="", max_chars=0):
+def persona_block(character, ctx, chapters, rules, guard="", actions=True, compact=False, typing="", action_rule="", max_chars=0,
+                  voice_lines=()):
     """The system text that makes a model this person. `compact` is for the short ambient lines, where the full world would cost
     more than the answer."""
+    stable, now = persona_parts(character, ctx, chapters, rules, guard, actions, compact, typing, action_rule, max_chars, voice_lines)
+    return "\n".join(part for part in (stable, now) if part)
+
+
+def persona_parts(character, ctx, chapters, rules, guard="", actions=True, compact=False, typing="", action_rule="", max_chars=0,
+                  voice_lines=(), events=(), flavors=None):
+    """(the part of the prompt that stays the same from one message to the next, what is true right now). A provider caches a prompt by
+    its longest unchanged start, so the sheet, the story and the rules go first and where the bot is and what it is doing go last."""
     race, info = character["race"], lore.RACES[character["race"]]
     name = first_name(character["name"])
     label = calling_label(race, character["calling"])
@@ -425,11 +497,10 @@ def persona_block(character, ctx, chapters, rules, guard="", actions=True, compa
         out.append("")
         out.append("YOUR STORY SO FAR (this is your life; draw on it, never contradict it)")
         out.append(story)
-    now = now_text(character, ctx)
-    if now:
+    if voice_lines:
         out.append("")
-        out.append("RIGHT NOW")
-        out.append(now)
+        out.append("HOW YOU SOUND (lines you have said before: for your voice only, never repeat them)")
+        out.extend("- " + line for line in voice_lines)
     out.append("")
     out.append("HOW YOU SPEAK AND ACT")
     out.append(rules.replace("{max}", str(max_chars or 250)))
@@ -439,7 +510,8 @@ def persona_block(character, ctx, chapters, rules, guard="", actions=True, compa
         out.append(action_rule + " Say it in your own words and in character when you do.")
     if guard:
         out.append(guard)
-    return "\n".join(out)
+    now = now_text(character, ctx, events=events, flavors=flavors)
+    return "\n".join(out), ("RIGHT NOW\n" + now) if now else ""
 
 
 def voice_line(character):
@@ -508,6 +580,8 @@ class Rp:
         self.jobs = queue.Queue()
         self.pending = set()
         self.worker = None
+        self.bank = None            # the line bank, for a character's voice examples (set by the gateway)
+        self.voices = {}            # bot guid -> its voice examples
         self.stats = {"stories": 0, "chapters": 0, "failures": 0}
 
     # ---- the character -------------------------------------------------------------------------------
@@ -536,8 +610,20 @@ class Rp:
             if level != row["level"] or zone != row["zone"]:
                 self.store.set_rp_state(guid, level, zone)
                 row["level"], row["zone"] = level, zone
+        self._observe(row, ctx)
         self._grow(row)
         return self.as_persona(row)
+
+    def _observe(self, row, ctx):
+        """Keep what the game says the bot has done, and have the errands it carries described once."""
+        now = time.time()
+        events = [(now - e["ago"], e["kind"], e["text"], ctx.get("level") or row["level"], ctx.get("zone") or row["zone"]) for e in ctx.get("events") or []]
+        self.store.add_rp_events(row["bot_guid"], events)
+        titles = ctx.get("quests") or []
+        have = self.store.quest_flavor(titles)
+        for title in titles[:3]:
+            if title not in have:
+                self._schedule(("quest", title, (ctx.get("quest_goals") or {}).get(title, "")))
 
     def as_persona(self, row):
         """A persona-shaped dict, so the rest of the service (the bank, the dashboard's lists, memory) treats it like any other bot."""
@@ -566,6 +652,8 @@ class Rp:
                     self.store.save_rp_chapter(guid, bracket, lore.LEVEL_BRACKETS[bracket][0], text, "template")
                     self._schedule(("chapter", guid, bracket))
             self.store.set_rp_chapters_to(guid, current)
+            if current >= 1:
+                self._schedule(("recap", guid, current - 1))
         if not row["story"] and row["source"] == "generated":
             self._schedule(("story", guid, 0))
 
@@ -596,8 +684,30 @@ class Rp:
     def _run(self, job):
         kind, guid, bracket = job
         try:
+            if kind == "quest":                  # (kind, title, aim): what an errand is about, written once for everyone who carries it
+                text = usable_text(self.writer(quest_request(guid, bracket)), 200, minimum=20)
+                if text:
+                    self.store.save_quest_flavor(guid, text)
+                else:
+                    self.stats["failures"] += 1
+                return
             row = self.store.rp_character(guid)
             if not row:
+                return
+            if kind == "recap":                  # the stretch of life just ended, rewritten around what really happened in it
+                low, high = lore.LEVEL_BRACKETS[bracket]
+                events = self.store.rp_events(guid, 12, low, high)
+                current = {c["bracket"]: c for c in self.store.rp_chapters(guid)}.get(bracket)
+                if len(events) < 2 or (current and current["source"] == "manual"):
+                    return
+                previous = [c["text"] for c in self.store.rp_chapters(guid) if c["bracket"] < bracket]
+                zones = bracket_zones(row["race"], bracket, random.Random("chapter:%d:%d" % (guid, bracket)))
+                text = usable_text(self.writer(chapter_request(row, bracket, [row["story"] or row["facts"]] + previous, zones, events)), 420)
+                if text:
+                    self.store.save_rp_chapter(guid, bracket, low, text, "ai")
+                    self.stats["recaps"] = self.stats.get("recaps", 0) + 1
+                else:
+                    self.stats["failures"] += 1
                 return
             if kind == "story":
                 text = usable_text(self.writer(story_request(row)), 900)
@@ -626,9 +736,40 @@ class Rp:
     def chapters(self, guid):
         return self.store.rp_chapters(guid)
 
-    def block(self, persona, ctx, rules, guard="", actions=True, compact=False, typing="", action_rule="", max_chars=0):
+    VOICE_SITUATIONS = ("rp_idle_muse", "rp_reply_banter", "rp_idle_creed", "rp_idle_homesick", "rp_idle_humor", "rp_reply_greeting", "rp_idle_story")
+
+    def voice_samples(self, persona, count=4):
+        """A few lines of this character's own bank, the same ones every time (so the prompt stays cacheable): how it sounds, shown
+        rather than described. Empty when the bank has nothing for it."""
+        guid = persona["bot_guid"]
+        if guid in self.voices:
+            return self.voices[guid]
+        lines = []
+        if self.bank is not None:
+            rng = random.Random("voice:%d" % guid)
+            situations = list(self.VOICE_SITUATIONS)
+            rng.shuffle(situations)
+            for situation in situations:
+                if len(lines) >= count:
+                    break
+                with self.store.conn() as db:
+                    rows = [row["text"] for row in db.execute(
+                        "SELECT text FROM bank WHERE archetype = ? AND situation = ? ORDER BY id LIMIT 40", (persona["archetype"], situation))
+                        if "{" not in row["text"]]
+                if rows:
+                    lines.append(rows[rng.randrange(len(rows))])
+        self.voices[guid] = lines
+        return lines
+
+    def block_parts(self, persona, ctx, rules, guard="", actions=True, compact=False, typing="", action_rule="", max_chars=0, voices=True):
         row = persona["row"]
-        return persona_block(row, ctx, self.store.rp_chapters(row["bot_guid"]), rules, guard, actions, compact, typing, action_rule, max_chars)
+        events = [] if ctx.get("events") else self.store.rp_events(row["bot_guid"], 5)     # what the game sent is fresher than what was kept
+        return persona_parts(row, ctx, self.store.rp_chapters(row["bot_guid"]), rules, guard, actions, compact, typing, action_rule, max_chars,
+                             self.voice_samples(persona) if voices else (), events, self.store.quest_flavor(ctx.get("quests") or []))
+
+    def block(self, persona, ctx, rules, guard="", actions=True, compact=False, typing="", action_rule="", max_chars=0):
+        stable, now = self.block_parts(persona, ctx, rules, guard, actions, compact, typing, action_rule, max_chars, voices=not compact)
+        return "\n".join(part for part in (stable, now) if part)
 
 
 def parse_channels(text):

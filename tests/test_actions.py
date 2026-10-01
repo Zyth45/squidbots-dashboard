@@ -76,6 +76,10 @@ if __name__ == "__main__":
 
 
 class ToolRoundLimitTests(GatewayCase):
+    def setUp(self):
+        super().setUp()
+        self.store.set_setting("plain_chat_no_tools", "0")      # these are about the round limit, not about plain chat
+
     def rounds(self, count):
         request = chat(20014, "Brick", 77, "Ann", "trade me your staff")
         request["tools"] = [{"type": "function", "function": {"name": "core", "parameters": {"type": "object"}}}]
@@ -100,3 +104,52 @@ class ToolRoundLimitTests(GatewayCase):
         request["messages"].append({"role": "user", "content": "thanks, one more thing"})
         self.gateway.handle("smart", request)
         self.assertIn("tools", self.provider.requests[-1]["body"])
+
+
+class PlainChatTests(GatewayCase):
+    """A message that asks nothing of the bot is answered without the tools' schemas (most of the prompt)."""
+
+    def ask(self, text, **more):
+        request = chat(20014, "Brick", 77, "Ann", text)
+        request["tools"] = [{"type": "function", "function": {"name": "core", "parameters": {"type": "object"}}}]
+        request["tool_choice"] = "auto"
+        request.update(more)
+        self.provider.answers.append("ok")
+        self.gateway.handle("smart", request)
+        return self.provider.requests[-1]["body"]
+
+    def test_conversation_is_answered_without_tools(self):
+        sent = self.ask("tell me who you are, and how was the road?")
+        self.assertNotIn("tools", sent)
+        self.assertNotIn("tool_choice", sent)
+        self.assertEqual(self.gateway.plain_chats, 1)
+
+    def test_anything_that_could_be_a_request_keeps_the_tools(self):
+        for text in ("invite me please", "can you follow me?", "what gear are you wearing", "go ahead of us", "how much gold do you have"):
+            self.assertIn("tools", self.ask(text), text)
+
+    def test_a_follow_up_to_something_the_bot_just_did_keeps_them(self):
+        self.gateway._note_actions(tool_round(chat(20014, "Brick", 77, "Ann", "invite me"), "c1", "core", {"action": "invite"}, {"ok": True}),
+                                   self.gateway_ident())
+        self.assertIn("tools", self.ask("yes, that one"))
+
+    def test_a_tick_with_no_player_and_the_middle_of_a_tool_round_keep_them(self):
+        request = chat(20014, "Brick", 0, "", "x")
+        request["messages"][0]["content"] = request["messages"][0]["content"].replace("- playerGuid = 0, name =   (the player talking to you)\n", "")
+        request["tools"] = [{"type": "function", "function": {"name": "core"}}]
+        self.provider.answers.append("ok")
+        self.gateway.handle("smart", request)
+        self.assertIn("tools", self.provider.requests[-1]["body"])
+        round_one = tool_round(chat(20014, "Brick", 77, "Ann", "tell me about yourself"), "c1", "core", {"action": "get_state"}, {"hp": 100})
+        round_one["tools"] = [{"type": "function", "function": {"name": "core"}}]
+        self.provider.answers.append("ok")
+        self.gateway.handle("smart", round_one)
+        self.assertIn("tools", self.provider.requests[-1]["body"])
+
+    def test_the_switch_turns_it_off(self):
+        self.store.set_setting("plain_chat_no_tools", "0")
+        self.assertIn("tools", self.ask("who are you?"))
+
+    def gateway_ident(self):
+        from mind import identity
+        return identity.Identity(20014, "Brick", 77, "Ann")

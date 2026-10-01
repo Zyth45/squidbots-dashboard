@@ -14,10 +14,11 @@ Lanes:
 import copy
 import json
 import os
+import re
 import threading
 import time
 
-from . import ambient, bank, community, filters, identity, memory, personas, prompt, rp as rp_module, upstream
+from . import ambient, bank, community, filters, identity, memory, personas, prompt, rp as rp_module, rp_bank as rp_bank_module, upstream
 
 LANES = ("smart", "fast", "memory", "ambient")
 PROFILE_HEADER = "x-mind-profile"        # use this profile instead of the lane's (the dashboard's Test button)
@@ -47,12 +48,15 @@ class Gateway:
         self.ambient = ambient.Ambient(self)
         self.community = community.Community(self)
         self.rp = rp_module.Rp(store, self._story_writer)
+        self.rp.bank = self.bank
         self.actions = {}      # (bot, player) -> the last things the bot did with its tools, so a follow-up can use them
         self.lock = threading.Lock()
         self.inflight = 0
         # Conversation requests that named a bot but no player: nothing can be remembered for those. Automatic
         # ticks are always like that; a player talking to a bot never should be, so the dashboard shows the count.
         self.no_player = 0
+        self.plain_chats = 0      # conversations answered without the tools (see _plain_chat)
+        self.rp_retries = 0       # roleplay replies said again because they slipped out of the world
         # A debugging aid: MIND_CAPTURE=<file> appends every request that leaves for a model (after the personality is
         # added) as a JSON line, so real traffic can be replayed against another model. Off unless the variable is set.
         self.capture_path = os.environ.get("MIND_CAPTURE", "")
@@ -113,6 +117,7 @@ class Gateway:
         prepared, mind_block, recalled = self._prepare(lane, body, ident, persona, context)
         if lane == "smart":
             self._limit_tool_rounds(prepared)
+            self._plain_chat(prepared, ident, persona, identity.last_user_text(body))
         if self.capture_path and not playground:
             self._capture(lane, ident, prepared)
 
@@ -153,6 +158,8 @@ class Gateway:
             cleaned = filters.clean(message["content"], int(self.store.setting("max_reply_chars")),
                                     filters.blocked_list(self.store.setting("blocked_words")), ident.bot_name)
             message["content"] = cleaned
+            if persona and persona.get("rp"):
+                self._keep_in_world(prepared, name, ident, message, said, turn_meta=meta)
         tools = ",".join((call.get("function") or {}).get("name", "") for call in message.get("tool_calls") or [])
         self._log_turn(turn, dict(meta, reply=(message.get("content") or "")[:2000], tool_calls=tools, ok=1), force=conversation)
 
@@ -167,6 +174,32 @@ class Gateway:
                               "latency_ms": meta["latency_ms"], "cost_usd": meta["cost_usd"],
                               "tool_calls": tools}
         return 200, answer
+
+    def _keep_in_world(self, prepared, profile, ident, message, said, turn_meta=None):
+        """A roleplaying bot that slipped (levels, servers, bots, the later game) says it again, once, in the world. Out of character on purpose
+        ((like this)) is allowed when the player started it, and a second slip is sent as it is rather than loop."""
+        text = message.get("content") or ""
+        slip = rp_bank_module.META.search(text) or rp_bank_module.ANACHRONISM.search(text)
+        if not slip or text.lstrip().startswith("((") or re.search(r"\(\(|\booc\b", said, re.I):
+            return
+        again = copy.deepcopy(prepared)
+        again["messages"] = list(again.get("messages") or []) + [
+            {"role": "assistant", "content": text},
+            {"role": "user", "content": "(You slipped: you said %r, which nobody in your world would say. Say it again in one to three short sentences, "
+                                        "as the person you are, without that and without mentioning any of this.)" % slip.group(0)}]
+        again.pop("tools", None)
+        again.pop("tool_choice", None)
+        self.rp_retries += 1
+        try:
+            answer, _ = self._dispatch("smart", ident.bot_guid, profile, again, set())
+        except (Limited, upstream.UpstreamError):
+            return
+        retry = ((answer.get("choices") or [{}])[0].get("message") or {}).get("content")
+        if not isinstance(retry, str) or not retry.strip():
+            return
+        retry = filters.clean(retry, int(self.store.setting("max_reply_chars")), filters.blocked_list(self.store.setting("blocked_words")), ident.bot_name)
+        if retry and not (rp_bank_module.META.search(retry) or rp_bank_module.ANACHRONISM.search(retry)):
+            message["content"] = retry
 
     def _capture(self, lane, ident, prepared):
         try:
@@ -284,6 +317,31 @@ class Gateway:
         except ValueError:
             return personas.default_mix()
 
+    # Words that mean a player wants something done (the module's own NeedsTools list, and a few more). A message with none of them is
+    # conversation, and the model does not need the tools' schemas for it: they are most of the prompt (14 tools are about 5,000 tokens).
+    ACTION_WORDS = frozenset((
+        "invite inv invites follow stay come trade give sell buy equip gear bag bags inventory gold money silver copper mail quest quests heal "
+        "tank group party guild summon attack kill stop loot craft repair cast learn train teleport portal mount talents talent spec stats "
+        "skills professions wearing equipped armor weapon weapons logout leave join accept decline drop destroy use open pull flee revive "
+        "resurrect rez release formation passive active strategy go get take bring fetch move walk run wait hold buff mana water food flight "
+        "disband disperse emote dance say whisper yell").split())
+
+    def _plain_chat(self, body, ident, persona, said):
+        """A player's plain conversation is answered without tools. Kept for anything that could be a request, for a follow-up to something the
+        bot just did, in the middle of a tool round, and for ticks no player started."""
+        if not persona or not ident.player_guid or self.store.setting("plain_chat_no_tools") != "1" or not body.get("tools"):
+            return
+        messages = body.get("messages") or []
+        last_user = max((i for i, m in enumerate(messages) if isinstance(m, dict) and m.get("role") == "user"), default=-1)
+        if last_user < 0 or any(isinstance(m, dict) and (m.get("role") == "tool" or m.get("tool_calls")) for m in messages[last_user + 1:]):
+            return
+        words = set(re.findall(r"[a-z0-9']+", said.lower()))      # what the player said, not what the service put in front of it
+        if words & self.ACTION_WORDS or self._recent_actions(ident):
+            return
+        body.pop("tools", None)
+        body.pop("tool_choice", None)
+        self.plain_chats += 1
+
     def _limit_tool_rounds(self, body):
         """The module runs the tool loop and stops with an empty answer at its own limit, which the player sees as a bot
         that ignored them. Past our limit the model is given no tools, so its next message is words, never another call."""
@@ -307,22 +365,34 @@ class Gateway:
             line = rp_module.voice_line(persona["row"]) if persona.get("rp") else prompt.voice_line(persona)
             return (_add_to_system(prepared, "", line) if line else prepared), line, 0
         guard = prompt.GUARD if self.store.setting("guard") == "1" else ""
+        # `parts` is what goes in front of the module's own text, `later` what goes after it: the part that changes from message to
+        # message (where the bot is, what it remembers of this player, what it just did) comes last, so a provider's prompt cache
+        # keeps hold of everything before it.
         if persona.get("rp"):
-            parts = [self.rp.block(persona, context or {}, self.store.setting("rp_rules"), guard, True, False, prompt.TYPING_RULE,
-                                   prompt.ACTION_RULE, int(self.store.setting("max_reply_chars")))]
+            stable, now = self.rp.block_parts(persona, context or {}, self.store.setting("rp_rules"), guard, True, False, prompt.TYPING_RULE,
+                                              prompt.ACTION_RULE, int(self.store.setting("max_reply_chars")))
+            parts, later = [stable], [now] if now else []
         else:
-            parts = [prompt.persona_block(persona, self.store.setting("style_rules"), guard)]
+            parts, later = [prompt.persona_block(persona, self.store.setting("style_rules"), guard)], []
         said = identity.last_user_text(body)
         recalled = memory.recall(self.store, ident.bot_guid, ident.player_guid, said)
         relation = self.store.relationship(ident.bot_guid, ident.player_guid) if ident.player_guid else None
         block = prompt.memory_block(ident.player_name, recalled, relation)
         if block:
-            parts.append(block)
+            later.append(block)
         done = prompt.actions_block(self._recent_actions(ident))
         if done:
-            parts.append(done)
-        text = "\n\n".join(parts)
-        return _add_to_system(prepared, text, ""), text, len(recalled)
+            later.append(done)
+        before, after = "\n\n".join(parts), "\n\n".join(later)
+        # A provider that caches a prompt reuses a message only when all of it is unchanged, so the first system message (our sheet and the
+        # module's own text) must be the same from one turn to the next: what changes goes in a system message of its own after it, and
+        # the module's roleplay_context line (read already, and with ever-growing "ago" times) is taken out of it.
+        snapshot = _take_snapshot(prepared)       # hit points, zone id and the party change from turn to turn too
+        _add_to_system(prepared, before, "")
+        if snapshot or after:
+            _put_before_last_user(prepared, "\n\n".join(part for part in (snapshot, after) if part))
+        # The conversation log shows what was added for this turn with what differs from turn to turn (where the bot is, its memories) first.
+        return prepared, "\n\n".join(part for part in (snapshot, after, before) if part), len(recalled)
 
     # ---- what the bot just did -----------------------------------------------------------------------
 
@@ -483,6 +553,38 @@ def _system_text(body):
 def _midnight():
     now = time.localtime()
     return time.mktime((now.tm_year, now.tm_mon, now.tm_mday, 0, 0, 0, 0, 0, -1))
+
+
+SNAPSHOT = re.compile(r"\[BOT STATE SNAPSHOT[^\n]*\n(?:[^\n]+(?:\n|$))+")
+
+
+def _take_snapshot(body):
+    """Cut the module's `[BOT STATE SNAPSHOT]` block out of the first system message and return it, without its `roleplay_context={...}` line (the
+    mind service has read that already, and its "ago" times change with every request). "" when there is none."""
+    for message in body.get("messages") or []:
+        if isinstance(message, dict) and message.get("role") == "system" and isinstance(message.get("content"), str):
+            content = message["content"]
+            found = SNAPSHOT.search(content)
+            if not found:
+                message["content"] = re.sub(r"[ \t]*roleplay_context=\{.*\}[ \t]*\n?", "", content)
+                return ""
+            message["content"] = (content[:found.start()].rstrip("\n") + "\n\n" + content[found.end():].lstrip("\n")).strip("\n") + "\n"
+            return re.sub(r"[ \t]*roleplay_context=\{.*\}[ \t]*\n?", "", found.group(0)).strip()
+    return ""
+
+
+def _put_before_last_user(body, text):
+    """What is true this turn goes in front of what the player just said, in the last user message: a provider that caches a prompt keeps
+    everything but the last message (the first system message, which is the same every turn), so this is the one place a change costs nothing."""
+    messages = body["messages"]
+    for message in reversed(messages):
+        if isinstance(message, dict) and message.get("role") == "user":
+            said = message.get("content")
+            if isinstance(said, str):
+                message["content"] = ("THIS TURN (what is true right now; the player's words follow)\n%s\n\nTHE PLAYER SAYS:\n%s" % (text, said))
+                return
+            break
+    messages.append({"role": "user", "content": "THIS TURN (what is true right now)\n%s" % text})
 
 
 def _add_to_system(body, before, after):

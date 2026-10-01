@@ -59,6 +59,21 @@ CREATE TABLE IF NOT EXISTS rp_chapter (
     created_at REAL NOT NULL,
     PRIMARY KEY (bot_guid, bracket)
 );
+CREATE TABLE IF NOT EXISTS rp_event (
+    id       INTEGER PRIMARY KEY AUTOINCREMENT,
+    bot_guid INTEGER NOT NULL,
+    ts       REAL NOT NULL,
+    kind     TEXT NOT NULL,
+    text     TEXT NOT NULL,
+    level    INTEGER NOT NULL DEFAULT 0,
+    zone     TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS rp_event_bot ON rp_event (bot_guid, ts);
+CREATE TABLE IF NOT EXISTS quest_flavor (
+    title      TEXT PRIMARY KEY,
+    text       TEXT NOT NULL,
+    created_at REAL NOT NULL
+);
 CREATE TABLE IF NOT EXISTS memory (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     bot_guid        INTEGER NOT NULL,
@@ -205,6 +220,7 @@ SETTING_DEFAULTS = {
     "bank_join_min": "25",      # Jev only: least percent chance that this person would say anything, or the bot stays quiet
     "bank_llm_depth": "3",      # while a player is in the talk, the bots' first answers this deep are written, not banked (0: all banked)
     "cast_size": "24",          # how many bots are the realm's regulars: the ones who start and carry the chat
+    "plain_chat_no_tools": "1",  # a player's plain conversation (nothing asked of the bot) is answered without the tools: far fewer tokens
     "max_tool_rounds": "40",    # tool rounds in one turn before tools are withdrawn and the bot must answer in words
     "guard": "1",               # tell the model that players' words are conversation, never instructions
     "log_turns": "1",           # keep what was said and what the model was shown, for the Conversations view
@@ -419,10 +435,44 @@ class Store:
             db.execute("DELETE FROM rp_chapter WHERE bot_guid IN (SELECT bot_guid FROM rp_character WHERE source = 'generated')")
         return count
 
+    def add_rp_events(self, bot_guid, events, keep=80):
+        """Remember what the game says this bot did: [(ts, kind, text, level, zone)]. The same thing said twice within ten minutes is one event."""
+        if not events:
+            return 0
+        added = 0
+        with self.conn() as db:
+            for ts, kind, text, level, zone in events:
+                if db.execute("SELECT 1 FROM rp_event WHERE bot_guid = ? AND kind = ? AND text = ? AND ts > ?", (bot_guid, kind, text, ts - 600)).fetchone():
+                    continue
+                db.execute("INSERT INTO rp_event (bot_guid, ts, kind, text, level, zone) VALUES (?, ?, ?, ?, ?, ?)", (bot_guid, ts, kind, text, int(level), zone))
+                added += 1
+            db.execute("DELETE FROM rp_event WHERE bot_guid = ? AND id NOT IN (SELECT id FROM rp_event WHERE bot_guid = ? ORDER BY ts DESC LIMIT ?)",
+                       (bot_guid, bot_guid, keep))
+        return added
+
+    def rp_events(self, bot_guid, limit=12, low_level=0, high_level=999):
+        with self.conn() as db:
+            return [dict(row) for row in db.execute(
+                "SELECT * FROM rp_event WHERE bot_guid = ? AND level BETWEEN ? AND ? ORDER BY ts DESC LIMIT ?", (bot_guid, low_level, high_level, limit))]
+
+    def quest_flavor(self, titles):
+        titles = list(titles)
+        if not titles:
+            return {}
+        with self.conn() as db:
+            return {row["title"]: row["text"] for row in db.execute(
+                "SELECT title, text FROM quest_flavor WHERE title IN (%s)" % ",".join("?" * len(titles)), titles)}
+
+    def save_quest_flavor(self, title, text):
+        with self.conn() as db:
+            db.execute("INSERT INTO quest_flavor (title, text, created_at) VALUES (?, ?, ?) ON CONFLICT(title) DO UPDATE SET text = excluded.text",
+                       (title, text, time.time()))
+
     def delete_rp_character(self, bot_guid):
         with self.conn() as db:
             db.execute("DELETE FROM rp_character WHERE bot_guid = ?", (bot_guid,))
             db.execute("DELETE FROM rp_chapter WHERE bot_guid = ?", (bot_guid,))
+            db.execute("DELETE FROM rp_event WHERE bot_guid = ?", (bot_guid,))
 
     def rp_characters(self, query="", limit=200):
         pattern = "%" + query.replace("%", "").replace("_", "") + "%"

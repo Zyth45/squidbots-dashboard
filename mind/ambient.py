@@ -13,7 +13,7 @@ import re
 import threading
 import time
 
-from . import bank as bank_module, community as community_module, filters, identity, jev, memory, prompt, rp as rp_module, rp_bank
+from . import bank as bank_module, community as community_module, filters, identity, jev, lore, memory, prompt, rp as rp_module, rp_bank
 
 LINES_KEPT = 14              # per place: what a bot sees of the conversation so far
 FORGET_AFTER = 15 * 60       # seconds without a word before a place's log is dropped
@@ -153,6 +153,8 @@ class Ambient:
         self.topics = {}     # scene key -> (what the talk there is about, when it was noticed)
         self.player_at = {}  # scene key -> when a player last spoke there
         self.player_said = {}  # scene key -> (who, what) of that player's last line
+        self.topic_runs = {}   # scene key -> (topic, how many bot lines in a row have been about it)
+        self.npc_talk = {}     # (npc name, player guid) -> recent lines of a talk with a person of the world
         self.rng = random.random   # a test replaces it
 
     # ---- what has been said here ---------------------------------------------------------------------
@@ -185,6 +187,12 @@ class Ambient:
             return self._welcome(body)
         if isinstance(body, dict) and body.get("mode") == "combat":
             return self._combat(body)
+        if isinstance(body, dict) and body.get("mode") == "companion":
+            return self._companion(body)
+        if isinstance(body, dict) and body.get("mode") == "emote":
+            return self._emote(body)
+        if isinstance(body, dict) and body.get("mode") == "npc":
+            return self._npc(body)
         if not isinstance(body, dict) or body.get("mode") == "rewrite":
             return self._handle(body if isinstance(body, dict) else {})
         key = str(body.get("scene") or body.get("channel") or "say")
@@ -445,6 +453,186 @@ class Ambient:
                        started, 0.0, "party", situation, True)
         return {"text": text, "latency_ms": int((time.monotonic() - started) * 1000), "cost_usd": 0.0, "source": "bank"}
 
+    # ---- a companion remarks on the road ---------------------------------------------------------------
+
+    COMPANION_MOMENTS = {
+        "zone": "You and your companions have just come into %s.",
+        "levelup": "You have come into a new stretch of your life: you feel stronger and steadier than you did.",
+        "boss": "You and your companions have just brought down a great foe: %s.",
+        "death": "You have just fallen in battle and been raised again.",
+        "quest": "You and your companions have just finished an errand: %s.",
+        "rare": "You have come by something rare: %s.",
+        "idle": "The road is quiet and you say something to your companions to pass the time.",
+    }
+
+    def _companion(self, body):
+        """{"mode": "companion", "event": "zone", "detail": "Ashenvale", ...}: a bot travelling with a player says one line to its companions about
+        a moment on the road. Roleplay only, and written by the model, because the moment is specific."""
+        gateway, store = self.gateway, self.gateway.store
+        try:
+            guid = int(body.get("bot_guid") or 0)
+        except (TypeError, ValueError):
+            guid = 0
+        moment = self.COMPANION_MOMENTS.get(str(body.get("event") or ""))
+        detail = " ".join(str(body.get("detail") or "").split())[:80].replace("{", "").replace("}", "")
+        if not guid or not moment:
+            return {"text": "", "reason": "bot_guid and a known event are required"}
+        ident = identity.Identity(guid, str(body.get("bot_name") or "")[:40], 0, "")
+        if gateway._refuse(ident):
+            return {"text": "", "reason": "refused"}
+        context = rp_module.clean_context(body)
+        persona = gateway._persona(ident, context, "ambient")
+        name = store.profile_for("ambient", guid) or store.profile_for("fast", guid)
+        if not persona or not persona.get("rp") or not name:
+            return {"text": "", "reason": "no roleplay character or no model"}
+        companions = ", ".join(str(n)[:24] for n in (body.get("companions") or [])[:4] if n) or "your companions"
+        system = "\n\n".join([
+            gateway.rp.block(persona, context, store.setting("rp_rules"), "", False, True, prompt.TYPING_RULE, "", RP_MAX_CHARS),
+            "ON THE ROAD WITH %s\n%s Say ONE short line to them about it, at most %d characters, the way a travelling companion does: not a "
+            "report, a remark. Do not announce it like a notice and do not repeat what was just said. No quotation marks, no markdown, never "
+            "mention an AI, a bot or a game. A brief *action* is fine now and then. If you truly have nothing to say, answer exactly (silent)."
+            % (companions, moment % detail if "%s" in moment else moment, RP_MAX_CHARS)])
+        request = {"messages": [{"role": "system", "content": system}, {"role": "user", "content": "Say your line now."}], "temperature": 0.95}
+        turn = {"lane": "ambient", "bot_guid": guid, "bot_name": ident.bot_name, "player_guid": 0, "player_name": "",
+                "said": "[party] (%s %s)" % (body.get("event"), detail), "tools_offered": "", "mind": "companion", "system_prompt": system[:gateway_prompt_kept()]}
+        try:
+            answer, meta = gateway._dispatch("ambient", guid, name, request, set())
+        except Exception as failure:  # noqa: BLE001 - nothing said is better than something broken
+            gateway._log_turn(turn, dict(profile=name, ok=0, error=str(failure)), force=False)
+            return {"text": "", "reason": str(failure)[:200]}
+        raw = ((answer.get("choices") or [{}])[0].get("message") or {}).get("content") or ""
+        text = filters.clean(raw, RP_CUT_CHARS, filters.blocked_list(store.setting("blocked_words")), ident.bot_name, whole_thought=True).strip().strip('"“”').strip()
+        if not text or SILENT.match(text) or rp_bank.META.search(text) or rp_bank.ANACHRONISM.search(text):
+            gateway._log_turn(turn, dict(meta, reply=text or "(silent)", tool_calls="", ok=1), force=True)
+            return {"text": "", "reason": "silent"}
+        gateway._log_turn(turn, dict(meta, reply=text, tool_calls="", ok=1), force=True)
+        return {"text": text, "latency_ms": meta["latency_ms"], "cost_usd": meta["cost_usd"]}
+
+    # ---- a bot answers a player's emote -------------------------------------------------------------------
+
+    EMOTE_SITUATIONS = {"bow": "rp_reply_greeting", "salute": "rp_reply_greeting", "kneel": "rp_reply_greeting", "wave": "rp_reply_greeting",
+                        "hello": "rp_reply_greeting", "greet": "rp_reply_greeting", "bye": "rp_reply_farewell", "farewell": "rp_reply_farewell",
+                        "thank": "rp_reply_thanks", "laugh": "rp_reply_joke", "chuckle": "rp_reply_joke", "cheer": "rp_reply_brag",
+                        "cry": "rp_reply_sorrow", "sob": "rp_reply_sorrow", "rude": "rp_reply_banter", "spit": "rp_reply_banter",
+                        "flirt": "rp_reply_banter", "point": "rp_reply_warning", "beg": "rp_reply_sorrow"}
+
+    def _emote(self, body):
+        """{"mode": "emote", "emote": "bow", "player_name": ...}: a line, from the character's own bank, to go with the emote the bot makes
+        back. Free. Empty when the bank has none (the emote alone is still an answer)."""
+        gateway = self.gateway
+        try:
+            guid = int(body.get("bot_guid") or 0)
+        except (TypeError, ValueError):
+            guid = 0
+        situation = self.EMOTE_SITUATIONS.get(str(body.get("emote") or ""))
+        if not guid or not situation:
+            return {"text": "", "reason": "bot_guid and a known emote are required"}
+        ident = identity.Identity(guid, str(body.get("bot_name") or "")[:40], 0, "")
+        if gateway._refuse(ident):
+            return {"text": "", "reason": "refused"}
+        persona = gateway._persona(ident, rp_module.clean_context(body), "ambient")
+        if not persona or not persona.get("rp"):
+            return {"text": "", "reason": "no roleplay character"}
+        started = time.monotonic()
+        rows = gateway.bank.candidates(str(persona.get("archetype") or ""), [situation], guid, limit=12, rng=self.rng)
+        if not rows:
+            return {"text": "", "reason": "the bank has no line for this"}
+        chosen = rows[int(self.rng() * len(rows)) % len(rows)]
+        player = str(body.get("player_name") or "")[:40]
+        text = bank_module.fill(chosen["text"], player=player, zone=str(body.get("zone") or ""), klass=str(body.get("class") or ""))
+        if not text or "{" in text:
+            return {"text": "", "reason": "the line needed something we do not have"}
+        gateway.bank.used(guid, chosen["id"])
+        self._log_bank({"channel": "say", "message": "(emote: %s)" % body.get("emote")}, ident, player, text, "bank", started, 0.0, "say", situation, False)
+        return {"text": text, "latency_ms": int((time.monotonic() - started) * 1000), "cost_usd": 0.0, "source": "bank"}
+
+    # ---- a person of the world answers a traveller ------------------------------------------------------------
+
+    NPC_ROLES = (
+        ("innkeeper", "You keep an inn: beds, hot food, drink and the rumours of everyone who passes through."),
+        ("guard", "You are a guard: you watch the roads, answer a traveller's questions about the way and about trouble, and have no patience for troublemakers."),
+        ("sentinel", "You are a guard of your people's land, watchful and a little formal with strangers."),
+        ("watchman", "You are a guard: you watch the roads and know who goes by."),
+        ("flight master", "You run the flights from here: you know the routes and the fares, and little else."),
+        ("wind rider", "You run the flights from here: you know the routes and the fares, and little else."),
+        ("gryphon", "You run the flights from here: you know the routes and the fares, and little else."),
+        ("bat handler", "You run the flights from here: you know the routes and the fares, and little else."),
+        ("trainer", "You teach your craft to those who come to learn it, and judge them by how they ask."),
+        ("master", "You are a master of your craft and expect respect for it."),
+        ("vendor", "You sell your wares and know the price of everything in them."),
+        ("merchant", "You sell your wares and know the price of everything in them."),
+        ("supplies", "You sell your wares and know the price of everything in them."),
+        ("banker", "You keep other people's valuables safe and are discreet about all of it."),
+        ("auctioneer", "You run the auctions and have an eye for what a thing will fetch."),
+        ("stable", "You keep and tend travellers' beasts."),
+        ("weapon", "You sell and mend arms and have opinions about every blade you see."),
+        ("armor", "You sell and mend armour and size up a traveller by what they wear."),
+    )
+
+    def _npc(self, body):
+        """{"mode": "npc", "npc_name", "npc_title", "zone", "area", "faction", "player_name", "player_guid", "player_race", "message"}: a real
+        character of the world (an innkeeper, a guard, a trainer) answers what a player said to them, in character, in a line or two."""
+        gateway, store = self.gateway, self.gateway.store
+        npc = " ".join(str(body.get("npc_name") or "").split())[:40]
+        title = " ".join(str(body.get("npc_title") or "").split())[:40]
+        message = " ".join(str(body.get("message") or "").split())[:200]
+        if not npc or not message:
+            return {"text": "", "reason": "npc_name and message are required"}
+        if gateway._refuse(identity.Identity()):
+            return {"text": "", "reason": "refused"}
+        name = store.profile_for("ambient", 0) or store.profile_for("fast", 0)
+        if not name:
+            return {"text": "", "reason": "no model"}
+        zone, area = str(body.get("zone") or "")[:60], str(body.get("area") or "")[:60]
+        side = str(body.get("faction") or "Neutral")
+        player_side = str(body.get("player_faction") or "")
+        player = str(body.get("player_name") or "a traveller")[:40]
+        race = str(body.get("player_race") or "")[:30]
+        role = next((text for word, text in self.NPC_ROLES if word in (npc + " " + title).lower()), "You are a person of this place, going about your day.")
+        attitude = ""
+        mood = str(body.get("attitude") or "")
+        if mood == "hostile" or (not mood and side in ("Alliance", "Horde") and player_side in ("Alliance", "Horde") and side != player_side):
+            attitude = "The traveller is of the other side, the enemies of your people: be curt, wary and unfriendly, but do not threaten more than words. "
+        elif mood == "friendly" or (not mood and side == player_side):
+            attitude = "The traveller is one of your own side: you are civil, even warm. "
+        key = (npc, int(body.get("player_guid") or 0))
+        with self.lock:
+            talk = [(at, who, text) for at, who, text in self.npc_talk.get(key, ()) if time.time() - at < 300]
+        place = lore.zone_text(zone, area) if zone else ""
+        system = "\n\n".join([
+            "WHO YOU ARE\nYou are %s%s, a living person of the world of Warcraft in the age of the Lich King, never a player and never a machine. "
+            "%s Your side is %s." % (npc, (", " + title) if title else "", role, side),
+            ("WHERE YOU ARE\n%s" % place) if place else "WHERE YOU ARE\nYou are in %s." % (zone or "a place you know well"),
+            "WHO SPEAKS TO YOU\n%s%s. %s" % (player, (", a " + race) if race else "", attitude),
+            "HOW TO REPLY\nAnswer in ONE or TWO short sentences, at most %d characters, as this person would aloud. Know only what someone in your place would "
+            "know: for what you cannot know, say so as a local would. Say errand or task, never 'quest', and never mention levels, experience, the game, "
+            "servers, an AI or a bot. Do not invent named people or places you are not sure of. No quotation marks, no markdown. A brief *action* is "
+            "fine now and then." % RP_MAX_CHARS])
+        lines = ["Recent talk:"] + ["[%s] %s" % (who, text) for _, who, text in talk[-4:]] if talk else []
+        lines += ["[%s] %s" % (player, message), "Write %s's answer now." % npc]
+        request = {"messages": [{"role": "system", "content": system}, {"role": "user", "content": "\n".join(lines)}], "temperature": 0.8}
+        turn = {"lane": "ambient", "bot_guid": 0, "bot_name": npc, "player_guid": int(body.get("player_guid") or 0), "player_name": player,
+                "said": "[npc] %s: %s" % (player, message), "tools_offered": "", "mind": "npc", "system_prompt": system[:gateway_prompt_kept()]}
+        try:
+            answer, meta = gateway._dispatch("ambient", 0, name, request, set())
+        except Exception as failure:  # noqa: BLE001 - the NPC simply says nothing
+            gateway._log_turn(turn, dict(profile=name, ok=0, error=str(failure)), force=False)
+            return {"text": "", "reason": str(failure)[:200]}
+        raw = ((answer.get("choices") or [{}])[0].get("message") or {}).get("content") or ""
+        text = filters.clean(raw, RP_CUT_CHARS, filters.blocked_list(store.setting("blocked_words")), npc, whole_thought=True).strip().strip('"“”').strip()
+        if not text or SILENT.match(text) or rp_bank.META.search(text) or rp_bank.ANACHRONISM.search(text):
+            gateway._log_turn(turn, dict(meta, reply=text or "(silent)", tool_calls="", ok=1), force=True)
+            return {"text": "", "reason": "silent"}
+        with self.lock:
+            log = self.npc_talk.setdefault(key, collections.deque(maxlen=8))
+            log.append((time.time(), player, message))
+            log.append((time.time(), npc, text))
+            if len(self.npc_talk) > 200:
+                for stale in [k for k, v in self.npc_talk.items() if v and time.time() - v[-1][0] > 600]:
+                    del self.npc_talk[stale]
+        gateway._log_turn(turn, dict(meta, reply=text, tool_calls="", ok=1), force=True)
+        return {"text": text, "latency_ms": meta["latency_ms"], "cost_usd": meta["cost_usd"]}
+
     # ---- a regular greets a player who has just logged in ----------------------------------------------
 
     WELCOME = ("WELCOME\n%s has just logged in and you are glad to see them. Write ONE short line, one or two short sentences and at most %d characters, the way "
@@ -459,6 +647,11 @@ class Ambient:
                   "most %d characters, the way you greet someone you know who has come back: by name, warm, in your own voice and your people's "
                   "way. If you remember something about them, mention it lightly; if you do not know them, a plain friendly greeting. Ask at most "
                   "one thing. No quotation marks, no markdown, never mention an AI, a bot or a game.")
+
+    RP_ENCOUNTER = ("A FAMILIAR FACE ON THE ROAD\n%s has just come near you. If you know them (see what you remember), greet them in ONE short line, one or "
+                    "two short sentences and at most %d characters: by name, in the way you feel about them, mentioning something you remember "
+                    "lightly if it fits. If you do not know them, a short hail, as a stranger would. No quotation marks, no markdown, never mention "
+                    "an AI, a bot or a game.")
 
     RP_JOINED = ("A NEW FELLOW\n%s has just joined your guild. Welcome them in ONE short line, one or two short sentences and at most %d "
                  "characters: by name, warm, in your own voice and your people's way, as a guild-fellow would. No quotation marks, no markdown, "
@@ -487,6 +680,12 @@ class Ambient:
         if not persona or not name:
             return {"text": "", "reason": "no persona or no model"}
         roleplay = bool(persona.get("rp"))
+        proximity = bool(body.get("proximity"))
+        if proximity:
+            # A player has walked up to this bot. Only a character greets, and mostly people it already knows; a stranger gets a hail now and then.
+            relation = store.relationship(guid, player_guid)
+            if not roleplay or ((not relation or relation["interactions"] < 1) and self.rng() > 0.1):
+                return {"text": "", "reason": "a stranger, or not a character"}
         if roleplay:
             parts = [gateway.rp.block(persona, context, store.setting("rp_rules"), "", False, True, prompt.TYPING_RULE, "", RP_MAX_CHARS),
                      "WHERE YOU ARE\nYou are %s." % rp_module.WHERE.get(channel, rp_module.WHERE["say"])]
@@ -498,7 +697,9 @@ class Ambient:
         block = prompt.memory_block(player, memory.recall(store, guid, player_guid, "")[:3], store.relationship(guid, player_guid))
         if block:
             parts.append(block)
-        if roleplay:
+        if roleplay and proximity:
+            parts.append(self.RP_ENCOUNTER % (player, RP_MAX_CHARS))
+        elif roleplay:
             parts.append((self.RP_JOINED if body.get("joined") else self.RP_WELCOME) % (player, RP_MAX_CHARS))
         else:
             parts.append((self.JOINED if body.get("joined") else self.WELCOME) % (player, MAX_CHARS))
@@ -645,6 +846,7 @@ class Ambient:
         return not (talked and depth <= int(self.gateway.store.setting("bank_llm_depth")))
 
     TOPIC_FRESH_S = 150
+    TOPIC_FATIGUE = 6        # lines in a row about one subject, with no player in the talk, before it is let go
 
     def _topic_here(self, key, lines, roleplay=False):
         """What the talk in this place is about: read from the last few lines, else what it was a moment ago."""
@@ -652,6 +854,16 @@ class Ambient:
         topic = (rp_bank.topic_of if roleplay else bank_module.topic_of)(lines)
         with self.lock:
             if topic:
+                # Bots keep each other on one subject for ever if nobody stops them. After a handful of lines in a row with no player in the
+                # talk, the subject is dropped and the next line is free to wander (or the next bot to start something new).
+                run_topic, count = self.topic_runs.get(key, ("", 0))
+                count = count + 1 if run_topic == topic else 1
+                self.topic_runs[key] = (topic, count)
+                talked = now - self.player_at.get(key, 0) < self.PLAYER_LIVE_S
+                if count > self.TOPIC_FATIGUE and not talked:
+                    self.topic_runs[key] = ("", 0)
+                    self.topics.pop(key, None)
+                    return ""
                 self.topics[key] = (topic, now)
                 return topic
             known = self.topics.get(key)

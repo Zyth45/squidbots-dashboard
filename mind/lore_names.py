@@ -149,7 +149,8 @@ def _generated(race, gender, rng, parts=2):
         name = clean_name(rng.choice(low.split()) + "".join(rng.choice(high.split()) for _ in range(parts - 1)))
         if gender == "female" and not name.endswith("a"):
             name = clean_name(name[:11] + rng.choice(["a", "ia", "ya", "ea"]))
-        if valid(name) and len(name) >= 4:
+        # A long name is a mouthful in chat: nine letters at most, except for gnomes (whose names are meant to be silly) and three-part names.
+        if valid(name) and 4 <= len(name) <= (12 if race == "Gnome" or parts == 3 else 9):
             return name
     return clean_name(low.split()[0] + high.split()[0])
 
