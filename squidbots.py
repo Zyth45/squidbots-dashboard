@@ -896,7 +896,7 @@ def write_atomic(path, body):
     os.replace(temporary, path)
 
 
-# What pclab.fr/bots and any other public copy may carry, key by key. A key added to the stats
+# What a public copy (publishDir) may carry, key by key. A key added to the stats
 # later stays on this machine until it is listed here: the public copy is chosen, not filtered.
 PUBLIC_KEYS = ("build", "generatedAt", "generatedTs", "totals", "session", "uptime", "history", "actions",
                "top", "roles", "factions", "xpRate", "zones", "compare", "footer", "classNames", "bots",
