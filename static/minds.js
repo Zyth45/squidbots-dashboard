@@ -589,7 +589,9 @@
       return;
     }
     renderStatus(overview);
-    if (!$("mindChatStyle").contains(document.activeElement)) renderChatStyle(overview);
+    // Only a field being typed in blocks the redraw: the mode button that was just clicked still has focus, and must show the new state.
+    const typing = document.activeElement;
+    if (!($("mindChatStyle").contains(typing) && /^(INPUT|TEXTAREA|SELECT)$/.test(typing.tagName))) renderChatStyle(overview);
     // A dropdown that is open (or a field being typed in) must not be redrawn under the user's hand.
     if (!$("mindProfiles").contains(document.activeElement)) renderProfiles(overview);
     if (!$("mindSettings").contains(document.activeElement)) renderSettings(overview);
