@@ -895,6 +895,9 @@ let LIVE = { byName: {}, age: null, missing: null };
 const MAP_ART_VERSION = 3;
 // Changed after an extraction, so the new maps replace whatever the browser holds.
 let ART_STAMP = "";
+// Set when a map picture fails to load (none extracted yet, or a fresh install): the map is then
+// drawn from the zone outlines alone instead of a broken picture. An extraction clears it.
+let MAP_ART_MISSING = null;
 
 async function loadWorld() {
   if (WORLD) return WORLD;
@@ -1035,12 +1038,12 @@ function renderMap(data) {
 
   if (zoom) {
     view = { x: 0, y: 0, w: 1, h: 1 };
-    image = "maps/zones/" + encodeURIComponent(zoom.name) + ".png?v=" + MAP_ART_VERSION + ART_STAMP;
+    image = MAP_ART_MISSING === ART_STAMP ? null : "maps/zones/" + encodeURIComponent(zoom.name) + ".png?v=" + MAP_ART_VERSION + ART_STAMP;
     dots = here.map(p => ({ b: p.b, live: p.at.live, spot: worldToPct(zoom.bounds, p.at.x, p.at.y) }))
       .filter(p => inBox(p.spot, 0.01));
   } else {
     view = contentBounds(continent);
-    image = "maps/" + encodeURIComponent(MAP_ID) + ".png?v=" + MAP_ART_VERSION + ART_STAMP;
+    image = MAP_ART_MISSING === ART_STAMP ? null : "maps/" + encodeURIComponent(MAP_ID) + ".png?v=" + MAP_ART_VERSION + ART_STAMP;
     dots = here.map(p => ({ b: p.b, live: p.at.live, spot: worldToPct(continent.bounds, p.at.x, p.at.y) }))
       .filter(p => inBox(p.spot, 0.02));
     hits = continent.zones.map(z => {
@@ -1076,6 +1079,13 @@ function renderMap(data) {
     + (zoom ? '<div class="map-crumb"><button class="ghost" type="button" id="mapBack">'
         + "← " + esc(continent.name) + "</button><span>" + esc(zoneTitle(zoom)) + "</span></div>"
       : '<div class="map-crumb"><span>Click a zone to open its map. Hover a bot for its status.</span></div>');
+  const picture = holder.querySelector(".map-svg image");
+  if (picture) {
+    picture.addEventListener("error", () => {
+      MAP_ART_MISSING = ART_STAMP;
+      if (LAST) renderMap(LAST);
+    });
+  }
 
   const most = Math.max(1, Math.max.apply(null, zones.map(z => counts[z.name] || 0)));
   document.getElementById("mapZones").innerHTML = zones

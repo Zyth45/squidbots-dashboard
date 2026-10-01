@@ -41,9 +41,10 @@ POWERSHELL = os.path.join(os.environ.get("SystemRoot", r"C:\Windows"),
 if not os.path.exists(POWERSHELL):
     POWERSHELL = "powershell"
 def find_repack():
-    # <repack>\Dashboard or <repack>\CoA-Bots\Dashboard: the first parent holding the repack settings.
+    # <repack>\Dashboard, <repack>\CoA-Bots\Dashboard or <repack>\CoA-Bots\Tools\Dashboard: the first
+    # parent holding the repack settings.
     folder = os.path.dirname(HERE)
-    for _ in range(2):
+    for _ in range(4):
         if os.path.exists(os.path.join(folder, "Settings", "database.json")):
             return folder
         folder = os.path.dirname(folder)
@@ -51,8 +52,7 @@ def find_repack():
 
 
 ROOT = SETTINGS.get("repack") or find_repack()
-BUILDS = next((p for p in (os.path.join(HERE, "coa-level-builds.json"), r"C:\CoA-Build\coa-level-builds.json")
-               if os.path.exists(p)), os.path.join(HERE, "coa-level-builds.json"))
+BUILDS = os.path.join(HERE, "coa-level-builds.json")
 PORT = int(os.environ.get("COA_DASHBOARD_PORT") or SETTINGS.get("port") or 8088)
 
 # Bot settings the dashboard can edit. The .conf files are read by the server at
@@ -539,17 +539,27 @@ HEAL = {6, 31, 37, 40, 43, 51, 98, 101}
 TANK = {9, 17, 21, 22, 48, 52, 57, 60, 96, 97, 99, 100}
 
 
+def repack_mysql():
+    """The repack's own MySQL client, mysql/bin/mysql.exe. A wider search comes second: a repack also
+    ships sources (Source/...) whose mysql.exe may not run on its own."""
+    own = os.path.join(ROOT, "mysql", "bin", "mysql.exe")
+    if os.path.exists(own):
+        return own
+    return next((p for p in glob.iglob(os.path.join(ROOT, "**", "bin", "mysql.exe"), recursive=True)
+                 if os.sep + "Source" + os.sep not in p), None)
+
+
 def mysql(query):
     if SETTINGS.get("mysqlArgs"):
         # Without "mysqlExe", look for the client inside the repack rather than at a path that only
         # exists on the machine this was written on: a server with its own bundled MySQL has no other.
-        exe = SETTINGS.get("mysqlExe") or next(
-            glob.iglob(os.path.join(ROOT, "**", "mysql.exe"), recursive=True),
-            "C:/Program Files/MySQL/MySQL Server 8.4/bin/mysql.exe")
+        exe = SETTINGS.get("mysqlExe") or repack_mysql() or "mysql"
         login = list(SETTINGS["mysqlArgs"])
     else:
         password = json.load(open(os.path.join(ROOT, "Settings", "database.json"), encoding="utf-8"))["rootPassword"]
-        exe = next(glob.iglob(os.path.join(ROOT, "**", "mysql.exe"), recursive=True))
+        exe = repack_mysql()
+        if not exe:
+            raise RuntimeError("no mysql.exe in %s (set mysqlExe in dashboard.json)" % ROOT)
         repack = os.path.join(ROOT, "Settings", "repack.json")
         port = json.load(open(repack, encoding="utf-8-sig")).get("mysqlPort", 3307) if os.path.exists(repack) else 3307
         login = ["--host=127.0.0.1", "--port=%d" % port, "-uroot", "-p" + password]
