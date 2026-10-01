@@ -128,6 +128,16 @@ class PlainChatTests(GatewayCase):
         for text in ("invite me please", "can you follow me?", "what gear are you wearing", "go ahead of us", "how much gold do you have"):
             self.assertIn("tools", self.ask(text), text)
 
+    def test_a_question_about_the_bots_own_things_or_a_follow_up_to_one_keeps_the_tools(self):
+        # "whats your cape" and "can I have it?" were answered with a shrug and an acted-out hand-over because they matched no action word.
+        for text in ("Aldric whats your cape", "Can I have it?", "what's in your pockets", "Can't you check?", "do you have any spare linen", "hold on"):
+            self.assertIn("tools", self.ask(text), text)
+
+    def test_only_small_talk_and_questions_about_the_person_go_without_them(self):
+        for text in ("hello there", "how are you today?", "who are you?", "where do you hail from", "are you an AI?", "thanks, that helps",
+                     "what do you think of the Horde?", "tell me about your home"):
+            self.assertNotIn("tools", self.ask(text), text)
+
     def test_a_follow_up_to_something_the_bot_just_did_keeps_them(self):
         self.gateway._note_actions(tool_round(chat(20014, "Brick", 77, "Ann", "invite me"), "c1", "core", {"action": "invite"}, {"ok": True}),
                                    self.gateway_ident())

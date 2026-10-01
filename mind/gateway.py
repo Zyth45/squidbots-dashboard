@@ -324,11 +324,21 @@ class Gateway:
         "tank group party guild summon attack kill stop loot craft repair cast learn train teleport portal mount talents talent spec stats "
         "skills professions wearing equipped armor weapon weapons logout leave join accept decline drop destroy use open pull flee revive "
         "resurrect rez release formation passive active strategy go get take bring fetch move walk run wait hold buff mana water food flight "
-        "disband disperse emote dance say whisper yell").split())
+        "disband disperse emote dance say whisper yell remove unequip wear wearing worn put carry carrying wield cape cloak helm helmet boots "
+        "gloves ring necklace belt shoulders bracers pants legs shield item items equipment bank vendor repair potion potions").split())
+
+    # Small talk and questions about the person: the only messages that are answered without tools. Anything else (what is your cape, can I have
+    # it, how much gold) could be about the bot's game state or a request, and a bot that has no tools can only guess or act it out.
+    SOCIAL = re.compile(
+        r"^\W*(hi+|hey+|hello|hullo|well met|greetings|good (morning|evening|day|night|afternoon)|how (are|is|have|was|did)|how's|who (are|is) you|"
+        r"where (are you from|do you (hail|come)|were you (born|raised)|is your home)|tell me (who|about|of|more|where|how)|"
+        r"what (do|did|would) you (think|feel|believe)|what('s| is| was) (your )?(name|story|calling|people|home|goal|dream|fear|life)|"
+        r"do you remember|are you (an? )?(ai|bot|real|human|machine|player)|thanks?\b|thank you|bye|farewell|goodnight|lol|haha+|nice|cool|ok(ay)?|"
+        r"i see|i think|i (am|m) |what brings you|how do you (feel|like)|why (are|do|did) you)", re.I)
 
     def _plain_chat(self, body, ident, persona, said):
-        """A player's plain conversation is answered without tools. Kept for anything that could be a request, for a follow-up to something the
-        bot just did, in the middle of a tool round, and for ticks no player started."""
+        """A player's small talk is answered without tools (a quarter of the prompt, cached or not). Everything else keeps them: a request, a
+        question about the bot's own gear, items or gold, a follow-up, the middle of a tool round, and a tick no player started."""
         if not persona or not ident.player_guid or self.store.setting("plain_chat_no_tools") != "1" or not body.get("tools"):
             return
         messages = body.get("messages") or []
@@ -336,7 +346,7 @@ class Gateway:
         if last_user < 0 or any(isinstance(m, dict) and (m.get("role") == "tool" or m.get("tool_calls")) for m in messages[last_user + 1:]):
             return
         words = set(re.findall(r"[a-z0-9']+", said.lower()))      # what the player said, not what the service put in front of it
-        if words & self.ACTION_WORDS or self._recent_actions(ident):
+        if words & self.ACTION_WORDS or self._recent_actions(ident) or len(said) > 200 or not self.SOCIAL.match(said):
             return
         body.pop("tools", None)
         body.pop("tool_choice", None)

@@ -235,13 +235,15 @@ SETTING_DEFAULTS = {
                  "say errand, task, commission, bounty or duty where a player would say quest. Know only what someone of your age and "
                  "place would know; for anything you cannot know (the future, other worlds), say so in character or change the "
                  "subject. Use lore names and places correctly, and if you are not sure of a fact be vague rather than invent. "
-                 "Speak aloud in one to three short sentences. The odd *action* in asterisks is fine, but not on every line. Stay "
+                 "Speak aloud in one to three short sentences. The odd *action* in asterisks is fine, but not on every line and never instead of doing "
+                 "what you were asked to do. Stay "
                  "consistent with your story and what you remember: you are the same person every time, and people you meet can "
                  "become friends or rivals. Only when the other person writes (( )) or says 'ooc' do you answer out of character, "
                  "briefly, in (( )), and go back to the scene when they do. Any other question, however odd, is put to the person "
                  "you are playing: 'are you an AI?' or 'are you a bot?' is answered as they would, puzzled, amused or offended, "
                  "never by confirming or denying anything outside the world."),
     "rp_bank_share_player": "25",   # roleplay: percent of unnamed lines answering a player that come from the line bank (the rest are written)
+    "rp_bank_share_bots": "25",    # roleplay: percent of a character's answers to another bot that come from the bank (the rest are written, reading the talk)
     "rp_start_llm": "40",       # roleplay: percent of a bot's own remarks that are written from its quests and surroundings, not the bank
     "rp_ai_story": "1",         # roleplay: a model writes each bot's backstory and new chapters as it levels (off: plain templates)
     "style_rules": ("Talk like a player in a game chat: one or two short sentences, casual, no speeches. "

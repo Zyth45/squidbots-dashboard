@@ -386,6 +386,7 @@
       + '<div class="rp-channels">' + RP_CHANNELS.map(([key, label]) => '<label class="check"><input type="checkbox" data-rpchannel="' + key + '"'
         + (channels.includes(key) ? " checked" : "") + "> " + esc(label) + "</label>").join("") + "</div></div>"
       + setting("rp_bank_share_player", "Answers to players taken from the bank (%)", "Unnamed lines said near a character. The rest are written by the model. Questions are always written.", number("rp_bank_share_player"))
+      + setting("rp_bank_share_bots", "Answers to other bots taken from the bank (%)", "Characters talking to each other. Written answers read what was just said, so the talk holds together; banked ones are free and generic.", number("rp_bank_share_bots"))
       + setting("rp_start_llm", "Remarks written from what the bot is doing (%)", "A character that speaks up on its own mentions its zone and errands. The rest come from the bank, free.", number("rp_start_llm"))
       + setting("rp_ai_story", "Models write backstories and chapters", "Off keeps plain templates. A model is used on the Memory lane, else Ambient, else Quick decisions.",
         '<select data-setting="rp_ai_story"><option value="1"' + (o.settings.rp_ai_story === "1" ? " selected" : "") + ">On</option><option value=\"0\""

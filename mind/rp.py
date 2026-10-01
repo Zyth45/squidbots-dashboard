@@ -507,7 +507,10 @@ def persona_parts(character, ctx, chapters, rules, guard="", actions=True, compa
     if typing:
         out.append(typing)
     if actions and action_rule:
-        out.append(action_rule + " Say it in your own words and in character when you do.")
+        out.append(action_rule + " Say it in your own words and in character when you do. Never act an action out instead of doing it: if the player "
+                   "asks you to do something in the game (take off or put on a piece of gear, give or trade something, follow, invite, stay, sell), "
+                   "call the tool first and say it in character afterwards; an *asterisk action* is colour and never a substitute. If you cannot, say "
+                   "so in character. If you are asked what you wear, carry or hold, look with your tools instead of guessing. If something does not work, never quote an error, a tool or an action name: say in character that it did not come off.")
     if guard:
         out.append(guard)
     now = now_text(character, ctx, events=events, flavors=flavors)

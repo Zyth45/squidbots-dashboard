@@ -727,8 +727,11 @@ class Ambient:
 
     def _share(self, rewrite, speaker_is_bot, player_speaker, roleplay=False):
         store = self.gateway.store
-        if rewrite or speaker_is_bot:
+        if rewrite:
             return int(store.setting("bank_share_bots"))
+        if speaker_is_bot:
+            # Characters answering each other read what was said: a banked line was written for no one in particular and reads as a non sequitur.
+            return int(store.setting("rp_bank_share_bots" if roleplay else "bank_share_bots"))
         if not player_speaker:
             return int(store.setting("bank_share_bots"))
         return int(store.setting("rp_bank_share_player" if roleplay else "bank_share_player"))

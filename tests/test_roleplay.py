@@ -490,6 +490,22 @@ class AmbientRoleplayTests(RoleplayCase):
         self.assertEqual(answer["source"], "bank")
         self.assertEqual(self.provider.requests, [])
 
+    def test_a_character_answering_another_bot_mostly_writes_its_answer_so_the_talk_holds_together(self):
+        character = self.gateway.rp.character(20014, "Alte Bot", rp.clean_context(CONTEXT))
+        self.gateway.bank.add_lines(character["archetype"], "rp_reply_greeting", ["Well met, friend."])
+        self.gateway.bank.add_lines(character["archetype"], "rp_reply_other", ["Hm."])
+        line = ambient(speaker_is_bot=True, speaker_guid=20015, speaker_name="Faelira Nightbreeze", message="Tell me, Alte, how fares your spirit?",
+                       depth=2)
+        self.gateway.ambient.rng = lambda: 0.5                   # past the 25% the bank gets: a written reply
+        self.provider.answers.append("Faelira, my spirit is steady; the road is not.")
+        answer = self.gateway.ambient.handle(line)
+        self.assertEqual(answer["text"], "Faelira, my spirit is steady; the road is not.")
+        self.assertEqual(len(self.provider.requests), 1)
+        self.gateway.ambient.rng = lambda: 0.1                   # within it: from the bank, free
+        self.provider.requests.clear()
+        answer = self.gateway.ambient.handle(dict(line, message="Well met!", speaker_name="Faelira Nightbreeze"))
+        self.assertEqual(self.provider.requests, [])
+
     def test_a_question_is_never_taken_from_the_bank(self):
         character = self.gateway.rp.character(20014, "Alte Bot", rp.clean_context(CONTEXT))
         self.gateway.bank.add_lines(character["archetype"], "rp_reply_question", ["Who knows."])

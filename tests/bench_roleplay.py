@@ -53,13 +53,13 @@ def key():
     raise SystemExit("no OPENAI_API_KEY")
 
 
-def profile(model, effort):
-    return {"name": model, "base_url": BASE, "model": model, "max_tokens": 160, "timeout_s": 60,
+def profile(model, effort, base=BASE):
+    return {"name": model, "base_url": base, "model": model, "max_tokens": 160, "timeout_s": 120,
             "extra": json.dumps({"reasoning_effort": effort}) if effort else ""}
 
 
 def effort_for(model, secret):
-    if not PRICES[model][2]:
+    if model not in PRICES or not PRICES[model][2]:
         return None
     for effort in ("none", "minimal", "low"):
         try:
@@ -86,14 +86,14 @@ def scenarios():
     return out
 
 
-def one(model, effort, secret, scenario):
+def one(model, effort, secret, scenario, base=BASE):
     try:
-        answer, latency = upstream.complete(profile(model, effort), {"messages": scenario["messages"], "temperature": 0.9}, secret)
+        answer, latency = upstream.complete(profile(model, effort, base), {"messages": scenario["messages"], "temperature": 0.9}, secret)
     except upstream.UpstreamError as error:
         return {"error": str(error)}
     message = (answer.get("choices") or [{}])[0].get("message") or {}
     usage = answer.get("usage") or {}
-    price = PRICES[model]
+    price = PRICES.get(model, (0.0, 0.0, False))
     return {"text": (message.get("content") or "").strip(), "ms": latency,
             "cost": ((usage.get("prompt_tokens") or 0) * price[0] + (usage.get("completion_tokens") or 0) * price[1]) / 1e6}
 
@@ -117,6 +117,7 @@ def main():
     parser.add_argument("--judge", default="gpt-6-luna")
     parser.add_argument("--reps", type=int, default=1)
     parser.add_argument("--workers", type=int, default=6)
+    parser.add_argument("--base-url", default=BASE, help="an OpenAI-compatible endpoint for the models under test, such as a local Ollama (http://127.0.0.1:11434/v1); the judge always uses OpenAI")
     args = parser.parse_args()
     secret = key()
     jury = effort_for(args.judge, secret)
@@ -124,9 +125,12 @@ def main():
     print("%d situations x %d reps" % (len(cases), args.reps), flush=True)
     rows = []
     for model in args.models.split(","):
-        effort = effort_for(model, secret)
+        local = args.base_url != BASE
+        effort = None if local else effort_for(model, secret)
+        if local:       # the first request loads the model into memory: not part of the timing
+            one(model, effort, "", cases[0], args.base_url)
         with concurrent.futures.ThreadPoolExecutor(args.workers) as pool:
-            results = list(pool.map(lambda case: one(model, effort, secret, case), cases * args.reps))
+            results = list(pool.map(lambda case: one(model, effort, "" if local else secret, case, args.base_url), cases * args.reps))
         pairs = [(case, result) for case, result in zip(cases * args.reps, results) if result.get("text")]
         with concurrent.futures.ThreadPoolExecutor(args.workers) as pool:
             scores = list(pool.map(lambda pair: judge(args.judge, jury, secret, pair[0], pair[1]["text"]), pairs))

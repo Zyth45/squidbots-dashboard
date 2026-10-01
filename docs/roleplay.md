@@ -99,6 +99,9 @@ Things the module does so that a bot is a person in the world and not a chat sou
   speaks up in `/say` only for those who can understand it, unless the realm allows two-side chat.
 - **Quicker speech.** A character talks, it does not type: shorter pauses before and while it answers, and a thinking gesture when it is
   spoken to by name.
+- **Characters answer each other from the model, mostly.** A bot's answer to another bot is written by the model reading the talk (75%, setting
+  `rp_bank_share_bots`), because a banked line was written for no one in particular and reads as a non sequitur in a guild. The module also slows a
+  roleplay conversation down: one answerer per line, a line spoken to someone by name answered by that someone only, at most five lines a scene.
 - **Bots do not stay on one subject for ever.** After six lines in a row about the same thing, with no player in the talk, it is let go.
 
 ## Responsiveness
@@ -111,8 +114,10 @@ Measured on the test realm, whispers to a roleplaying bot:
 | cost per whisper | $0.00024 to $0.00046 | $0.0001 |
 | model time | 1.5 to 1.9 s | about the same: the model's own time |
 
-What changed: a whisper that asks nothing of the bot (no invite, follow, trade, gear and the like) is answered **without the tool list**, which was
-most of the prompt (14 tools, about 5,000 tokens); anything that could be a request keeps the tools (`plain_chat_no_tools`). The prompt is
+What changed: small talk and questions about the person ("who are you?", "where do you hail from?", a greeting, thanks) are answered **without the
+tool list**, which was most of the prompt (14 tools, about 5,000 tokens); everything else keeps the tools (`plain_chat_no_tools`). The first version
+stripped them from anything that named no action word, and "whats your cape" and "can I have it?" got a shrug and an acted-out hand-over: only
+positively social lines go without tools now. The prompt is
 ordered for the provider's cache, which keeps everything but the last message: the sheet and the module's own text come first and stay
 identical from turn to turn, and what changes (the module's state snapshot, where the bot is, what it remembers of this player) is put in
 front of the player's words in the last message. Cached input is a tenth of the price: **cached tokens went from 0 to about 80% of the prompt**.
@@ -135,6 +140,22 @@ character. The service's heartbeat counts both (`plainChats`, `roleplayRetries`)
 
 The scores are all within the judge's noise, so the choice is speed and slips: the test realm's ambient lane runs on gpt-5.4-nano (a third
 quicker than gpt-6-luna, one slip in 48); conversation stays on gpt-6-luna, which does the tool work.
+
+### A local model instead of the API
+
+Tried on the test machine (RTX 3070 8 GB, Ollama 0.35 installed in a user folder, no sudo): the same 48 situations on three small open models.
+
+| model | score /8 | median | p90 | note |
+|---|---|---|---|---|
+| llama3.2:3b | 7.4 | 0.31 s | 0.53 s | 2 GB |
+| qwen2.5:7b-instruct | 7.2 | 0.46 s | 0.85 s | 4.7 GB |
+| gpt-5.4-nano (API, for comparison) | 7.75 | 0.87 s | 1.04 s | |
+
+One request at a time a local 3B or 7B is two to three times quicker than the API and free, at a small cost in quality (about 0.4 on the judge's scale). With
+four requests at once they queue on the one GPU (median 1.3 s and 1.7 s), which is no better than the API, so it suits a realm where lines arrive a few seconds
+apart. The mind service speaks to any OpenAI-compatible endpoint, so a local model is a profile with base URL `http://127.0.0.1:11434/v1`
+and a model name, assigned to the Ambient lane (not Conversation, which needs dependable tool calls). `python tests/bench_roleplay.py --models
+llama3.2:3b --base-url http://127.0.0.1:11434/v1` measures a model of your own.
 
 ## The roleplay line bank
 

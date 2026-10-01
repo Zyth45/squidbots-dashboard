@@ -696,7 +696,7 @@ class Api:
     SETTING_KINDS = {"auto_persona": "flag", "plain_chat_no_tools": "flag", "guard": "flag", "log_turns": "flag", "paused": "flag",
                      "style_rules": ("text", 600), "blocked_words": ("text", 300), "personality_mix": ("text", 600),
                      "ambient_vibe": ("text", 900), "chat_mode": ("choice", rp_module.MODES), "rp_channels": ("text", 80),
-                     "rp_rules": ("text", 2400), "rp_bank_share_player": ("int", 0, 100), "rp_start_llm": ("int", 0, 100),
+                     "rp_rules": ("text", 2400), "rp_bank_share_player": ("int", 0, 100), "rp_bank_share_bots": ("int", 0, 100), "rp_start_llm": ("int", 0, 100),
                      "rp_ai_story": "flag",
                      "daily_cap_usd": ("number", 0, 100000), "max_reply_chars": ("int", 40, 255),
                      "max_tool_rounds": ("int", 1, 200), "bank_share_player": ("int", 0, 100),
