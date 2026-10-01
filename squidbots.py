@@ -562,8 +562,9 @@ def mysql(query):
             raise RuntimeError("no mysql.exe in %s (set mysqlExe in dashboard.json)" % ROOT)
         repack = os.path.join(ROOT, "Settings", "repack.json")
         port = json.load(open(repack, encoding="utf-8-sig")).get("mysqlPort", 3307) if os.path.exists(repack) else 3307
-        login = ["--host=127.0.0.1", "--port=%d" % port, "-uroot", "-p" + password]
-    out = subprocess.run([exe] + login + ["-N", "-B", "-e", query],
+        # --password= even when it is empty: a bare -p would make mysql.exe wait for one on the keyboard.
+        login = ["--host=127.0.0.1", "--port=%d" % port, "-uroot", "--password=" + password]
+    out = subprocess.run([exe] + login + ["-N", "-B", "-e", query], stdin=subprocess.DEVNULL,
                          capture_output=True, text=True, encoding="utf-8", timeout=30)
     if out.returncode:
         raise RuntimeError(out.stderr.strip())
