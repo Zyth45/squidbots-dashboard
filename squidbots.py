@@ -109,7 +109,9 @@ USAGE_RE = re.compile(r"^(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d) coa usage since start 
 # Chat of the players and the bots, written by the worldserver when ChatLog.Enable = 1 and the
 # chat.* loggers point at a Chat.log appender. Absent: the dashboard simply shows no talkers.
 CHAT_LOG = SETTINGS.get("chatLog") or os.path.join(os.path.dirname(COA_LOG), "Chat.log")
-CHAT_RE = re.compile(r"^(?:(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d)\s+)?Player (\S+) (.*)$")
+# A name is one word, or two since Conquest of Azeroth's bots carry a surname ("Ilene Bot"): it ends
+# where the verb (says, tells, whisper...) begins.
+CHAT_RE = re.compile(r"^(?:(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d)\s+)?Player (.+?) (?=(?:says|yells|emotes|whisper|tells|sends)\b)(.*)$")
 CHAT_TAIL = 16 * 1024 * 1024   # only the end of the file is read: a day of chat is far smaller
 SPELLS_RE = re.compile(r"^(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d) coa (interrupt|dispel) spells: (.*)$")
 COUNT_RE = re.compile(r"([a-z ]+?) (\d+)/(\d+)")
@@ -235,20 +237,20 @@ def chat_stats(hours=24, limit=12, bots=None):
 #   mod-bot-minds off-screen conversations (playerbots.chat):
 #     Player A says to B: ...
 CHAT_KINDS = ("say", "yell", "whisper", "party", "guild", "channel", "offscreen", "other")
-CHAT_LINE_RE = re.compile(r"^(?:(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d)\s+)?(?:Leader player|Player) (\S+) (.+)$")
+CHAT_LINE_RE = re.compile(r"^(?:(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d)\s+)?(?:Leader player|Player) (.+?) (?=(?:says|yells|emotes|whisper|tells|sends)\b)(.+)$")
 CHAT_FORMS = [
     # (pattern on the rest of the line, kind, channel: fixed text or a function of the match)
-    (re.compile(r"^says to ([^\s:]+): (.*)$"), "offscreen", None),
+    (re.compile(r"^says to ([^:]+?): (.*)$"), "offscreen", None),
     (re.compile(r"^says \(language \d+\): (.*)$"), "say", None),
     (re.compile(r"^yells \(language \d+\): (.*)$"), "yell", None),
     (re.compile(r"^emotes \(language \d+\): (.*)$"), "other", "emote"),
-    (re.compile(r"^whisper (\S+): (.*)$"), "whisper", None),
-    (re.compile(r"^tells (party|raid|bg) with leader \S+: (.*)$"), "party", lambda m: m.group(1)),
-    (re.compile(r"^sends raid warning raid with leader \S+: (.*)$"), "party", "raid warning"),
+    (re.compile(r"^whisper ([^:]+?): (.*)$"), "whisper", None),
+    (re.compile(r"^tells (party|raid|bg) with leader [^:]+?: (.*)$"), "party", lambda m: m.group(1)),
+    (re.compile(r"^sends raid warning raid with leader [^:]+?: (.*)$"), "party", "raid warning"),
     (re.compile(r'^tells guild "(.*?)": (.*)$'), "guild", lambda m: m.group(1)),
     (re.compile(r'^tells guild\.officer "(.*?)": (.*)$'), "guild", lambda m: m.group(1) + " officers"),
     (re.compile(r"^tells channel ([^:]+): (.*)$"), "channel", lambda m: m.group(1)),
-    (re.compile(r"^tells ([^\s:]+): (.*)$"), "whisper", None),     # older cores' whisper form
+    (re.compile(r"^tells ([^:]+?): (.*)$"), "whisper", None),     # older cores' whisper form
 ]
 CHAT_FIRST_READ = 2 * 1024 * 1024
 # The client's link and colour codes: "|cffffff00|Hquest:123:4|h[Name]|h|r" reads "[Name]".
@@ -366,7 +368,7 @@ def zone_names():
 
 # Rare finds, written by the bot module when worldserver.conf points "playerbots.loot" at an appender.
 LOOT_LOG = SETTINGS.get("lootLog") or os.path.join(os.path.dirname(COA_LOG), "BotLoot.log")
-LOOT_RE = re.compile(r"^(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d)\s+(\S+) \(class (\d+) level (\d+)\) looted "
+LOOT_RE = re.compile(r"^(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d)\s+(.+?) \(class (\d+) level (\d+)\) looted "
                      r"(.+?) \((\d+)\) quality (\d+) ilvl (\d+) x(\d+)$")
 
 
