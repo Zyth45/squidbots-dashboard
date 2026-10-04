@@ -126,6 +126,17 @@ with nothing to install. The same from a terminal:
 python tools/gen_art.py --client C:\my-client --dbc C:\my-server\server\data\dbc
 ```
 
+**In the CoA Bots repack** the dashboard is `CoA-Bots\Tools\Dashboard`, with its `tools` folder, and the
+map works at once with the zone outlines. For the real maps, press **Extract maps** above the map and
+give the folder of your game client (the one holding `Data\common.MPQ`), or run from
+`CoA-Bots\Tools\Dashboard`, with the repack's own Python:
+
+```bat
+..\..\..\Runtime\python\python.exe -B tools\gen_art.py --client "C:\path\to\your\client" --dbc ..\..\..\Data\dbc
+```
+
+then reload the page. The maps are taken from your own client, so the release does not ship them.
+
 The maps are Blizzard's and are git-ignored. With `publishDir` set, they are copied beside the public
 page (about 70 MB, only new or changed files), so the public map looks like the local one; without
 `publishDir` they never leave your machine. No other game art (interface, frames, icons) is used.
