@@ -15,7 +15,8 @@ Ce qui sort (agrégé, AUCUN nom de personnage, de compte ni d'adresse) :
   - bg[période] : par type (warsong, arathi, alterac, et « tous ») : parties, victoires Alliance / Horde, joueurs par
     partie, objectifs par camp (Warsong : captures, drapeaux rendus ; Arathi : bases attaquées / défendues ; Alterac :
     cimetières, tours, mines), coups fatals par camp, coups fatals par classe (avec le nombre de participations) ;
-  - arenes[période] : par type (2v2, 3v3, 5v5, « tous ») : combats cotés, durée moyenne et médiane, victoires par classe ;
+  - arenes[période] : par type (2v2, 3v3, 5v5, « tous ») : combats cotés, durée moyenne et médiane, victoires par classe,
+    et « durees », l'histogramme des durées [[secondes, combats], ...] (pvp_merge.py en refait moyenne et médiane) ;
   - classement : par type, les équipes d'arène qui ont joué, par cote (instantané d'arena_team) : cote, parties,
     victoires, composition par CLASSE, bots_only (tous les membres sur un compte de bot aléatoire : préfixe
     AiPlayerbot.RandomBotAccountPrefix de playerbots.conf, défaut « rndbot »). Le nom n'est gardé que pour une équipe de
@@ -25,6 +26,8 @@ Ce qui sort (agrégé, AUCUN nom de personnage, de compte ni d'adresse) :
     bots / joueurs, victoires honorables du jeu (totalKills, todayKills, yesterdayKills), coffres High Risk au sol ;
     et par période, les BG et arènes joués par ces personnages (participations, victoires, coups fatals) ;
   - manque : ce que la base ne fournit pas (table absente) : laissé de côté, jamais inventé.
+Les comptes bruts restent à côté des moyennes (« joueurs » des BG, « durees » des arènes, « classees » du classement) :
+pvp_merge.py additionne deux serveurs et recalcule parts, moyennes et médianes à partir d'eux.
 Contrôle avant d'écrire : aucun mot d'une chaîne du fichier n'est un nom de personnage (hors vocabulaire fixe : classes,
 camps, types) ; au moindre doute, rien n'est écrit (code 1). Écriture atomique (fichier .tmp puis remplacement).
 """
@@ -203,7 +206,7 @@ def bilan_bg(parties, joueurs_par_bg, cle_type):
                 k["kb"] += j["kb"]
                 k["v"] += 1 if j["gagne"] else 0
     n = len(parties)
-    out = {"parties": n, "victoires": v,
+    out = {"parties": n, "victoires": v, "joueurs": n_joueurs,
            "joueurs_par_partie": round(n_joueurs / n, 1) if n else None,
            "coups_fatals": {c: camps[c]["kb"] for c in CAMPS},
            "morts": {c: camps[c]["morts"] for c in CAMPS},
@@ -213,6 +216,33 @@ def bilan_bg(parties, joueurs_par_bg, cle_type):
         tot = {c: camps[c]["attr"][i - 1] for c in CAMPS}
         out["objectifs"].append({"cle": nom, "total": tot["alliance"] + tot["horde"], **tot})
     return out
+
+
+def histo(durees):
+    """[12, 9, 12] -> [[9, 1], [12, 2]] : durées exactes, taille bornée quel que soit le nombre de combats."""
+    h = {}
+    for d in durees:
+        h[d] = h.get(d, 0) + 1
+    return [[d, h[d]] for d in sorted(h)]
+
+
+def moyenne_histo(h):
+    n = sum(c for _, c in h)
+    return round(sum(d * c for d, c in h) / n) if n else None
+
+
+def mediane_histo(h):
+    """Médiane exacte d'un histogramme [[valeur, nombre], ...] trié (comme statistics.median sur la liste dépliée)."""
+    n = sum(c for _, c in h)
+    if not n:
+        return None
+    rangs, vus, vals = ((n - 1) // 2, n // 2), 0, []
+    for d, c in h:
+        for r in rangs:
+            if vus <= r < vus + c:
+                vals.append(d)
+        vus += c
+    return round(sum(vals) / 2)
 
 
 def bilan_arenes(combats, membres_par_combat):
@@ -230,6 +260,7 @@ def bilan_arenes(combats, membres_par_combat):
     return {"combats": len(combats),
             "duree_moyenne": round(sum(durees) / len(durees)) if durees else None,
             "duree_mediane": round(statistics.median(durees)) if durees else None,
+            "durees": histo(durees),
             "equipes_actives": len(equipes),
             "classes": sorted(classes.values(), key=lambda k: (-k["v"] / k["n"], -k["n"], k["classe"]))}
 
@@ -471,7 +502,7 @@ def main():
         jouees = sorted((e for e in liste if e["parties"] > 0), key=lambda e: (-e["cote"], -e["victoires"], e["numero"]))
         for i, e in enumerate(jouees, 1):
             e["rang"] = i
-        classement[t] = {"equipes": len(liste), "sans_partie": sum(1 for e in liste if e["parties"] == 0),
+        classement[t] = {"equipes": len(liste), "classees": len(jouees), "sans_partie": sum(1 for e in liste if e["parties"] == 0),
                          "de_joueurs": sum(1 for e in liste if not e["bots_only"]), "tete": jouees[:max(0, a.equipes)]}
 
     data = {
