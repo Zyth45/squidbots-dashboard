@@ -104,6 +104,10 @@ SETTINGS = [Setting(*row) for row in (
      "Conquest of Azeroth calls it Ascension. Until this matches, every broadcast meant for it is dropped."),
     ("AiPlayerbot.BroadcastToWorldGlobalChance", PLAYERBOTS, "Channels and chat", "Bot chatter in the realm-wide channel", "int", None, "restart",
      "0 to 30000; 0 keeps bots out of the realm-wide channel, which everybody reads. Their chatter belongs in Zone."),
+    ("AiPlayerbot.BotTextLocale", PLAYERBOTS, "Channels and chat", "Language of the bots' chat", "choice",
+     ["-1", "0", "2", "3", "6", "8"], "restart",
+     "The language of everything bots say on their own: channels, say, whispers, replies (the ai_playerbot_texts lines). "
+     "Auto follows the game client of the players online. Without AI."),
     ("AiPlayerbot.BotsWhisperPublic", PLAYERBOTS, "Channels and chat", "Bots whisper unasked", "bool", None, "restart",
      "On: bots whisper a player who writes in a channel, and tell their master every potion and buff. Off: a word in a channel no longer brings a wall of whispers."),
     ("AiPlayerbot.PublicReplyChance", PLAYERBOTS, "Channels and chat", "Bots answering a channel message (%)", "int", None, "restart",
@@ -147,6 +151,24 @@ SETTINGS = [Setting(*row) for row in (
 )]
 
 BY_KEY = {entry.key: entry for entry in SETTINGS}
+
+# What a choice means, for the page. The value is what the .conf holds.
+CHOICE_LABELS = {
+    "AiPlayerbot.BotTextLocale": {"-1": "Auto (the players' game client)", "0": "English", "2": "Français",
+                                  "3": "Deutsch", "6": "Español", "8": "Русский"},
+}
+
+# Settings a .conf may not have yet (mod-playerbots reads them, its .conf.dist did not list them):
+# shown with their default, and added at the end of the file the first time they are changed.
+# Every other setting is only ever edited in place.
+ADDABLE = {
+    "AiPlayerbot.BotTextLocale": ("-1", [
+        "AiPlayerbot.BotTextLocale",
+        "    Description: Language of the bots' own lines (ai_playerbot_texts).",
+        "                 -1 follows the game client of the players online; 0 enUS, 1 koKR, 2 frFR,",
+        "                 3 deDE, 4 zhCN, 5 zhTW, 6 esES, 7 esMX, 8 ruRU forces one.",
+        "    Default:     -1 (added by the SquidBots dashboard)"]),
+}
 
 _CHANCES = ["AiPlayerbot.RandomBotMinLevelChance", "AiPlayerbot.RandomBotMaxLevelChance"]
 _LLM = [s.key for s in SETTINGS if s.file == BOTMINDS and s.key != "BotMinds.Enable"]
@@ -265,9 +287,11 @@ def read_settings(conf_dir):
                 value, present = match.group(2).strip(), True
                 if kind == "quoted" and len(value) >= 2 and value[0] == value[-1] == '"':
                     value = value[1:-1]
+            elif key in ADDABLE:
+                value, present = ADDABLE[key][0], True       # the module's default until it is written
         out.append({"key": key, "file": filename, "group": group, "label": label,
                     "kind": kind, "choices": choices, "when": when, "help": help_text,
-                    "value": value, "present": present})
+                    "value": value, "present": present, "labels": CHOICE_LABELS.get(key)})
     return out
 
 
@@ -346,6 +370,12 @@ def apply_settings(conf_dir, changes, backup_dir):
         for key, value in pairs.items():
             pattern = _line_re(key)
             if not pattern.search(updated):
+                if key in ADDABLE:
+                    # A documented block at the end of the file, in the file's own line endings.
+                    newline = "\r\n" if "\r\n" in updated else "\n"
+                    block = ["", "#"] + ["#    " + line for line in ADDABLE[key][1]] + ["#", "", "%s = %s" % (key, value), ""]
+                    updated = updated.rstrip("\r\n") + newline + newline.join(block)
+                    continue
                 missing.append(key)
                 continue
             updated = pattern.sub(lambda m: m.group(1) + value + m.group(3), updated, count=1)

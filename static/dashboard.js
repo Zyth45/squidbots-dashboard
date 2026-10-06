@@ -4,6 +4,13 @@ const PUBLIC = false;
 /* ---------------- words ---------------- */
 const WORDS = {
   en: {
+    botLangTitle: "Language of the bots' chat",
+    botLangHelp: "What bots say on their own (channels, say, whispers) comes from the server's translated lines: pick the language here. No AI involved.",
+    botLangApply: "Apply", botLangMissing: "playerbots.conf was not found, so the language cannot be set from here.",
+    botLangRunning: "Read when the game server starts: apply, then restart it.",
+    botLangStopped: "The game server is stopped: the language applies when it starts.",
+    botLangSavedRunning: "Saved in playerbots.conf (backed up first). Restart the game server to hear it.",
+    botLangSavedStopped: "Saved in playerbots.conf (backed up first). It applies when the server starts.",
     locale: "en-GB",
     tagline: "Conquest of Azeroth · bots, live",
     searchBot: "Search a bot", otherLang: "FR",
@@ -76,6 +83,13 @@ const WORDS = {
     },
   },
   fr: {
+    botLangTitle: "Langue du chat des bots",
+    botLangHelp: "Ce que les bots disent d'eux-mêmes (canaux, dire, chuchotements) vient des répliques traduites du serveur : choisissez la langue ici. Sans IA.",
+    botLangApply: "Appliquer", botLangMissing: "playerbots.conf est introuvable, la langue ne peut pas être réglée d'ici.",
+    botLangRunning: "Lu au démarrage du serveur de jeu : appliquez, puis redémarrez-le.",
+    botLangStopped: "Le serveur de jeu est arrêté : la langue s'appliquera à son démarrage.",
+    botLangSavedRunning: "Enregistré dans playerbots.conf (sauvegardé avant). Redémarrez le serveur de jeu pour l'entendre.",
+    botLangSavedStopped: "Enregistré dans playerbots.conf (sauvegardé avant). Effectif au démarrage du serveur.",
     locale: "fr-FR",
     tagline: "Conquest of Azeroth · bots en direct",
     searchBot: "Chercher un bot", otherLang: "EN",
@@ -217,7 +231,7 @@ function showPage() {
     else link.removeAttribute("aria-current");
   }
   document.getElementById("pageTitle").textContent = W.pageTitles[PAGE];
-  /* private:start */if (PAGE === "chat") loadFeed();/* private:end */
+  /* private:start */if (PAGE === "chat") { loadFeed(); renderBotLang(); }/* private:end */
 }
 window.addEventListener("hashchange", showPage);
 
@@ -615,6 +629,36 @@ function renderChat(data) {
 }
 
 /* private:start */
+/* ---------------- the bots' chat language ---------------- */
+// AiPlayerbot.BotTextLocale in playerbots.conf: the language of every line the bots say on their own
+// (channels, say, whispers), from the translations in ai_playerbot_texts. No AI involved.
+const BOT_LANG_KEY = "AiPlayerbot.BotTextLocale";
+
+async function renderBotLang() {
+  const host = document.getElementById("botLang");
+  if (!host) return;
+  let config;
+  try { config = await (await fetch("/api/config", { cache: "no-store" })).json(); } catch (error) { return; }
+  const row = (config.settings || []).find(s => s.key === BOT_LANG_KEY);
+  if (!row) { host.innerHTML = '<p class="empty">' + esc(W.botLangMissing) + "</p>"; return; }
+  host.innerHTML = '<p class="set-help">' + esc(W.botLangHelp) + '</p><div class="search-row">'
+    + '<select id="botLangSelect">' + row.choices.map(c => '<option value="' + esc(c) + '"' + (c === row.value ? " selected" : "")
+      + ">" + esc((row.labels || {})[c] || c) + "</option>").join("") + "</select>"
+    + '<button class="btn primary" type="button" id="botLangApply">' + esc(W.botLangApply) + "</button></div>"
+    + '<p class="meta" id="botLangNote">' + esc(config.serverRunning ? W.botLangRunning : W.botLangStopped) + "</p>";
+  document.getElementById("botLangApply").addEventListener("click", async () => {
+    const value = document.getElementById("botLangSelect").value;
+    const note = document.getElementById("botLangNote");
+    let answer;
+    try {
+      answer = await (await fetch("/api/config", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [BOT_LANG_KEY]: value }) })).json();
+    } catch (error) { answer = { error: String(error) }; }
+    note.textContent = answer.error || (answer.errors && Object.values(answer.errors).join(" "))
+      || (answer.serverRunning ? W.botLangSavedRunning : W.botLangSavedStopped);
+  });
+}
+
 /* ---------------- live chat feed ---------------- */
 // Read from GET /api/chat every 5 s while the Chat page is open. The public copy has no
 // API behind it, so the feed is left out there.
@@ -1499,7 +1543,8 @@ function settingControl(setting) {
     return '<select id="' + id + '" data-key="' + esc(setting.key) + '">'
       + (setting.choices || []).map(c =>
         '<option value="' + esc(c) + '"' + (value === c ? " selected" : "") + ">"
-        + esc(c === "0" ? "0 (per-level curve)" : "x" + c) + "</option>").join("")
+        + esc(setting.labels && setting.labels[c] ? setting.labels[c] : c === "0" ? "0 (per-level curve)" : "x" + c)
+        + "</option>").join("")
       + "</select>";
   }
   return '<input id="' + id + '" data-key="' + esc(setting.key) + '" value="' + esc(value) + '">';
