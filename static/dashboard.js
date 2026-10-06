@@ -672,37 +672,6 @@ function renderChat(data) {
   });
 }
 
-/* private:start */
-/* ---------------- the bots' chat language ---------------- */
-// AiPlayerbot.BotTextLocale in playerbots.conf: the language of every line the bots say on their own
-// (channels, say, whispers), from the translations in ai_playerbot_texts. No AI involved.
-const BOT_LANG_KEY = "AiPlayerbot.BotTextLocale";
-
-async function renderBotLang() {
-  const host = document.getElementById("botLang");
-  if (!host) return;
-  let config;
-  try { config = await (await fetch("/api/config", { cache: "no-store" })).json(); } catch (error) { return; }
-  const row = (config.settings || []).find(s => s.key === BOT_LANG_KEY);
-  if (!row) { host.innerHTML = '<p class="empty">' + esc(W.botLangMissing) + "</p>"; return; }
-  host.innerHTML = '<p class="set-help">' + esc(W.botLangHelp) + '</p><div class="search-row">'
-    + '<select id="botLangSelect">' + row.choices.map(c => '<option value="' + esc(c) + '"' + (c === row.value ? " selected" : "")
-      + ">" + esc((row.labels || {})[c] || c) + "</option>").join("") + "</select>"
-    + '<button class="btn primary" type="button" id="botLangApply">' + esc(W.botLangApply) + "</button></div>"
-    + '<p class="meta" id="botLangNote">' + esc(config.serverRunning ? W.botLangRunning : W.botLangStopped) + "</p>";
-  document.getElementById("botLangApply").addEventListener("click", async () => {
-    const value = document.getElementById("botLangSelect").value;
-    const note = document.getElementById("botLangNote");
-    let answer;
-    try {
-      answer = await (await fetch("/api/config", { method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ [BOT_LANG_KEY]: value }) })).json();
-    } catch (error) { answer = { error: String(error) }; }
-    note.textContent = answer.error || (answer.errors && Object.values(answer.errors).join(" "))
-      || (answer.serverRunning ? W.botLangSavedRunning : W.botLangSavedStopped);
-  });
-}
-
 /* ---------------- PvP ---------------- */
 // pvp.json from tools/pvp_build.py (the players' site uses the same file). Two windows: the last 24 h, and
 // "since" a date of the server's (pvpSince in dashboard.json; without it, the whole history). No character
@@ -819,6 +788,37 @@ function renderPvp() {
   for (const button of host.querySelectorAll("[data-window]")) {
     button.addEventListener("click", () => { PVP_WINDOW = button.dataset.window; renderPvp(); });
   }
+}
+
+/* private:start */
+/* ---------------- the bots' chat language ---------------- */
+// AiPlayerbot.BotTextLocale in playerbots.conf: the language of every line the bots say on their own
+// (channels, say, whispers), from the translations in ai_playerbot_texts. No AI involved.
+const BOT_LANG_KEY = "AiPlayerbot.BotTextLocale";
+
+async function renderBotLang() {
+  const host = document.getElementById("botLang");
+  if (!host) return;
+  let config;
+  try { config = await (await fetch("/api/config", { cache: "no-store" })).json(); } catch (error) { return; }
+  const row = (config.settings || []).find(s => s.key === BOT_LANG_KEY);
+  if (!row) { host.innerHTML = '<p class="empty">' + esc(W.botLangMissing) + "</p>"; return; }
+  host.innerHTML = '<p class="set-help">' + esc(W.botLangHelp) + '</p><div class="search-row">'
+    + '<select id="botLangSelect">' + row.choices.map(c => '<option value="' + esc(c) + '"' + (c === row.value ? " selected" : "")
+      + ">" + esc((row.labels || {})[c] || c) + "</option>").join("") + "</select>"
+    + '<button class="btn primary" type="button" id="botLangApply">' + esc(W.botLangApply) + "</button></div>"
+    + '<p class="meta" id="botLangNote">' + esc(config.serverRunning ? W.botLangRunning : W.botLangStopped) + "</p>";
+  document.getElementById("botLangApply").addEventListener("click", async () => {
+    const value = document.getElementById("botLangSelect").value;
+    const note = document.getElementById("botLangNote");
+    let answer;
+    try {
+      answer = await (await fetch("/api/config", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [BOT_LANG_KEY]: value }) })).json();
+    } catch (error) { answer = { error: String(error) }; }
+    note.textContent = answer.error || (answer.errors && Object.values(answer.errors).join(" "))
+      || (answer.serverRunning ? W.botLangSavedRunning : W.botLangSavedStopped);
+  });
 }
 
 /* ---------------- live chat feed ---------------- */
