@@ -551,7 +551,8 @@ def repack_mysql():
                  if os.sep + "Source" + os.sep not in p), None)
 
 
-def mysql(query):
+def mysql_login():
+    """(mysql.exe, its login options), the same for every query."""
     if SETTINGS.get("mysqlArgs"):
         # Without "mysqlExe", look for the client inside the repack rather than at a path that only
         # exists on the machine this was written on: a server with its own bundled MySQL has no other.
@@ -566,6 +567,11 @@ def mysql(query):
         port = json.load(open(repack, encoding="utf-8-sig")).get("mysqlPort", 3307) if os.path.exists(repack) else 3307
         # --password= even when it is empty: a bare -p would make mysql.exe wait for one on the keyboard.
         login = ["--host=127.0.0.1", "--port=%d" % port, "-uroot", "--password=" + password]
+    return exe, login
+
+
+def mysql(query):
+    exe, login = mysql_login()
     out = subprocess.run([exe] + login + ["-N", "-B", "-e", query], stdin=subprocess.DEVNULL,
                          capture_output=True, text=True, encoding="utf-8", timeout=30)
     if out.returncode:
@@ -891,6 +897,51 @@ class Stats:
 STATS = Stats()
 
 
+# The PvP page: battlegrounds, arenas and High Risk / War Mode, built by tools/pvp_build.py (shared with the
+# players' site). Its file names no character; a team name is kept only for a team of random bots.
+PVP_FILE = os.path.join(HERE, "pvp.json")
+PVP_EVERY = 5 * 60
+
+
+class Pvp:
+    def __init__(self):
+        self.lock = threading.Lock()
+        self.built = 0
+        self.body = None
+
+    def get(self):
+        with self.lock:
+            if self.body is None or time.time() - self.built > PVP_EVERY:
+                self.body = self.build()
+                self.built = time.time()
+            return self.body
+
+    def build(self):
+        try:
+            exe, login = mysql_login()
+            command = [sys.executable, "-B", os.path.join(HERE, "tools", "pvp_build.py"), "--out", PVP_FILE,
+                       "--mysql", exe, "--chars-db", DB["characters"], "--auth-db", DB["auth"],
+                       # "Since" is a date of the server's own (a release, say): without one, the whole history.
+                       "--depuis", SETTINGS.get("pvpSince") or "", "--plancher", ""]
+            command += ["--mysql-opt=" + option for option in login]
+            if SETTINGS.get("pvpSinceTitle"):
+                command += ["--depuis-titre", SETTINGS["pvpSinceTitle"]]
+            conf = os.path.join(CONFIG_DIR or "", "playerbots.conf")
+            if CONFIG_DIR and os.path.exists(conf):
+                command += ["--playerbots-conf", conf]
+            out = subprocess.run(command, stdin=subprocess.DEVNULL, capture_output=True, text=True,
+                                 encoding="utf-8", errors="replace", timeout=300)
+            if out.returncode:
+                lines = (out.stderr or out.stdout).strip().splitlines()
+                raise RuntimeError(lines[-1] if lines else "pvp_build.py: code %d" % out.returncode)
+            return open(PVP_FILE, "rb").read()
+        except Exception as error:
+            return json.dumps({"error": str(error)}).encode("utf-8")
+
+
+PVP = Pvp()
+
+
 def write_atomic(path, body):
     # Visitors never read a half-written file: write aside, then swap.
     temporary = path + ".tmp"
@@ -935,7 +986,7 @@ def public_files():
         return open(os.path.join(HERE, *parts), "rb").read()
 
     script = PRIVATE_JS.sub("", read("static", "dashboard.js").decode("utf-8"))
-    script = script.replace('const API = "/api/stats";', 'const API = "stats.json";', 1)                    .replace("const PUBLIC = false;", "const PUBLIC = true;", 1)
+    script = script.replace('const API = "/api/stats";', 'const API = "stats.json";', 1)                    .replace('const PVP_API = "/api/pvp";', 'const PVP_API = "pvp.json";', 1)                    .replace("const PUBLIC = false;", "const PUBLIC = true;", 1)
     style = read("static", "dashboard.css")
     page = PRIVATE_HTML.sub("", read("index.html").decode("utf-8"))
     # A visitor's browser keeps the old script and style otherwise: name each by its content.
@@ -1022,6 +1073,9 @@ def publish_loop():
             publish_maps()
             write_atomic(os.path.join(PUBLISH_DIR, "stats.json"),
                          json.dumps(public_copy(data), ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
+            pvp = PVP.get()
+            if b'"error"' not in pvp[:20]:
+                write_atomic(os.path.join(PUBLISH_DIR, "pvp.json"), pvp)
         except Exception as error:  # the NAS may be asleep or unreachable: retry next minute
             print("Public copy failed:", error, flush=True)
         time.sleep(PUBLISH_EVERY)
@@ -1191,6 +1245,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self._json(STATS.get())
         elif path == "/api/config":
             self._json(config_payload())
+        elif path == "/api/pvp":
+            self._send(PVP.get(), "application/json; charset=utf-8")
         elif path == "/api/art":
             self._json(art_status())
         elif path == "/api/live":

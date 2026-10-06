@@ -1,9 +1,31 @@
 const API = "/api/stats";
 const PUBLIC = false;
+const PVP_API = "/api/pvp";
 
 /* ---------------- words ---------------- */
 const WORDS = {
   en: {
+    navPvp: "PvP",
+    pvpLoading: "Reading the battlegrounds and arenas…",
+    pvpError: "The PvP figures could not be read: ",
+    pvpBgTitle: "Battlegrounds", pvpBgSub: "games and wins per side",
+    pvpArenaTitle: "Arenas", pvpArenaSub: "rated fights",
+    pvpTeamsTitle: "Top arena teams", pvpTeamsSub: "rating now, games of the season",
+    pvpMarksTitle: "High Risk and War Mode", pvpMarksSub: "characters marked now, and their games",
+    pvpClassesTitle: "Classes in battlegrounds", pvpClassesSub: "killing blows per game",
+    pvpArenaClassesTitle: "Classes in arenas", pvpArenaClassesSub: "win rate",
+    pvpGames: "Games", pvpFights: "Fights", pvpAllianceWins: "Alliance wins", pvpHordeWins: "Horde wins",
+    pvpPerGame: "players per game", pvpKills: "Killing blows", pvpAvg: "Average", pvpMedian: "Median",
+    pvpTeams: "Active teams", pvpRating: "Rating", pvpWins: "Wins", pvpClasses: "Classes", pvpTeam: "Team",
+    pvpObjectivesHead: "Objectives (Alliance / Horde)",
+    pvpPlayersTeam: "Players' team", pvpTeamNo: "Team no. ", pvpNone: "Nothing played in this window.",
+    pvpCharacters: "Characters", pvpBots: "bots", pvpPlayers: "players",
+    pvpBgPlayed: "BG played", pvpArenaPlayed: "Arenas played", pvpWinRate: "Win rate", pvpOthers: "Everyone else",
+    pvpPlays: "Plays", pvpFrom: "From ",
+    pvpTypes: { warsong: "Warsong Gulch", arathi: "Arathi Basin", alterac: "Alterac Valley", tous: "All" },
+    pvpObjectives: { captures: "Flags captured", drapeaux_rendus: "Flags returned", bases_attaquees: "Bases assaulted",
+      bases_defendues: "Bases defended", tours_prises: "Towers taken", tours_defendues: "Towers defended",
+      cimetieres_pris: "Graveyards taken", cimetieres_defendus: "Graveyards defended", mines: "Mines taken" },
     botLangTitle: "Language of the bots' chat",
     botLangHelp: "What bots say on their own (channels, say, whispers) comes from the server's translated lines: pick the language here. No AI involved.",
     botLangApply: "Apply", botLangMissing: "playerbots.conf was not found, so the language cannot be set from here.",
@@ -17,7 +39,7 @@ const WORDS = {
     navWorld: "World", navBots: "Bots", navStats: "Stats",
     navChat: "Chat & Loot", navSettings: "Settings",
     pageTitles: { world: "World", bots: "Bots", stats: "Stats",
-      chat: "Chat & Loot", settings: "Settings" },
+      chat: "Chat & Loot", pvp: "PvP", settings: "Settings" },
     mapTitle: "Map", focusTitle: "Watching", focusNone: "Pick a bot on the map or in the Bots list to follow it here.",
     rosterTitle: "Every bot online", rosterFilter: "Filter by name, zone or class",
     sortLevel: "Level", sortName: "Name", sortZone: "Zone",
@@ -83,6 +105,27 @@ const WORDS = {
     },
   },
   fr: {
+    navPvp: "JcJ",
+    pvpLoading: "Lecture des champs de bataille et des arènes…",
+    pvpError: "Les chiffres JcJ n'ont pas pu être lus : ",
+    pvpBgTitle: "Champs de bataille", pvpBgSub: "parties et victoires par camp",
+    pvpArenaTitle: "Arènes", pvpArenaSub: "combats cotés",
+    pvpTeamsTitle: "Meilleures équipes d'arène", pvpTeamsSub: "cote actuelle, parties de la saison",
+    pvpMarksTitle: "High Risk et War Mode", pvpMarksSub: "personnages marqués maintenant, et leurs parties",
+    pvpClassesTitle: "Classes en champ de bataille", pvpClassesSub: "coups fatals par partie",
+    pvpArenaClassesTitle: "Classes en arène", pvpArenaClassesSub: "taux de victoire",
+    pvpGames: "Parties", pvpFights: "Combats", pvpAllianceWins: "Victoires Alliance", pvpHordeWins: "Victoires Horde",
+    pvpPerGame: "joueurs par partie", pvpKills: "Coups fatals", pvpAvg: "Moyenne", pvpMedian: "Médiane",
+    pvpTeams: "Équipes actives", pvpRating: "Cote", pvpWins: "Victoires", pvpClasses: "Classes", pvpTeam: "Équipe",
+    pvpObjectivesHead: "Objectifs (Alliance / Horde)",
+    pvpPlayersTeam: "Équipe de joueurs", pvpTeamNo: "Équipe n° ", pvpNone: "Rien de joué sur cette période.",
+    pvpCharacters: "Personnages", pvpBots: "bots", pvpPlayers: "joueurs",
+    pvpBgPlayed: "BG joués", pvpArenaPlayed: "Arènes jouées", pvpWinRate: "Taux de victoire", pvpOthers: "Tous les autres",
+    pvpPlays: "Participations", pvpFrom: "Depuis le ",
+    pvpTypes: { warsong: "Goulet des Chanteguerres", arathi: "Bassin d'Arathi", alterac: "Vallée d'Alterac", tous: "Tous" },
+    pvpObjectives: { captures: "Drapeaux capturés", drapeaux_rendus: "Drapeaux rendus", bases_attaquees: "Bases attaquées",
+      bases_defendues: "Bases défendues", tours_prises: "Tours prises", tours_defendues: "Tours défendues",
+      cimetieres_pris: "Cimetières pris", cimetieres_defendus: "Cimetières défendus", mines: "Mines prises" },
     botLangTitle: "Langue du chat des bots",
     botLangHelp: "Ce que les bots disent d'eux-mêmes (canaux, dire, chuchotements) vient des répliques traduites du serveur : choisissez la langue ici. Sans IA.",
     botLangApply: "Appliquer", botLangMissing: "playerbots.conf est introuvable, la langue ne peut pas être réglée d'ici.",
@@ -96,7 +139,7 @@ const WORDS = {
     navWorld: "Monde", navBots: "Bots", navStats: "Statistiques",
     navChat: "Chat et butin", navSettings: "Réglages",
     pageTitles: { world: "Monde", bots: "Bots", stats: "Statistiques",
-      chat: "Chat et butin", settings: "Réglages" },
+      chat: "Chat et butin", pvp: "JcJ", settings: "Réglages" },
     mapTitle: "Carte", focusTitle: "Suivi", focusNone: "Choisissez un bot sur la carte ou dans la liste des bots pour le suivre ici.",
     rosterTitle: "Tous les bots en ligne", rosterFilter: "Filtrer par nom, zone ou classe",
     sortLevel: "Niveau", sortName: "Nom", sortZone: "Zone",
@@ -216,7 +259,7 @@ function renderFooter() {
 
 /* ---------------- pages ---------------- */
 // The public copy is read-only: no settings.
-const PAGES = ["world", "bots", "stats", "chat", "settings"]
+const PAGES = ["world", "bots", "stats", "chat", "pvp", "settings"]
   .filter(page => !PUBLIC || page !== "settings");
 if (PUBLIC) {
   for (const node of document.querySelectorAll('.nav-link[href="#settings"]')) node.remove();
@@ -231,6 +274,7 @@ function showPage() {
     else link.removeAttribute("aria-current");
   }
   document.getElementById("pageTitle").textContent = W.pageTitles[PAGE];
+  if (PAGE === "pvp") loadPvp();
   /* private:start */if (PAGE === "chat") { loadFeed(); renderBotLang(); }/* private:end */
 }
 window.addEventListener("hashchange", showPage);
@@ -657,6 +701,124 @@ async function renderBotLang() {
     note.textContent = answer.error || (answer.errors && Object.values(answer.errors).join(" "))
       || (answer.serverRunning ? W.botLangSavedRunning : W.botLangSavedStopped);
   });
+}
+
+/* ---------------- PvP ---------------- */
+// pvp.json from tools/pvp_build.py (the players' site uses the same file). Two windows: the last 24 h, and
+// "since" a date of the server's (pvpSince in dashboard.json; without it, the whole history). No character
+// is named in it: a team keeps its name only when all its members are random bots.
+let PVP = null, PVP_AT = 0, PVP_WINDOW = "24h";
+
+async function loadPvp() {
+  const host = document.getElementById("pvp");
+  if (PVP && !PVP.error && Date.now() - PVP_AT < 60000) { renderPvp(); return; }
+  if (!PVP) host.innerHTML = '<p class="empty">' + esc(W.pvpLoading) + "</p>";
+  try {
+    PVP = await (await fetch(PVP_API, { cache: "no-store" })).json();
+    PVP_AT = Date.now();
+  } catch (error) { PVP = { error: String(error) }; }
+  renderPvp();
+}
+
+function renderPvp() {
+  const host = document.getElementById("pvp");
+  if (!PVP) return;
+  if (PVP.error) { host.innerHTML = '<p class="empty">' + esc(W.pvpError + PVP.error) + "</p>"; return; }
+  const L = lang === "fr" ? 1 : 0;
+  const n = v => v === null || v === undefined ? "–" : Number(v).toLocaleString(W.locale);
+  const pct = (a, b) => b ? Math.round(a / b * 100) + " %" : "–";
+  const secs = s => s === null || s === undefined ? "–" : Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
+  const sub = text => ' <span class="sub">' + esc(text) + "</span>";
+  const table = (heads, rows) => "<table><thead><tr>" + heads.map((h, i) => "<th" + (i && h !== null && h.r ? ' class="r"' : "")
+    + ">" + esc(h === null ? "" : h.t) + "</th>").join("") + "</tr></thead><tbody>" + rows + "</tbody></table>";
+  const H = (t, r) => ({ t, r });
+  const none = '<p class="empty">' + esc(W.pvpNone) + "</p>";
+
+  const windows = PVP.periodes || [];
+  if (!windows.some(p => p.cle === PVP_WINDOW)) PVP_WINDOW = (windows[0] || {}).cle;
+  const period = windows.find(p => p.cle === PVP_WINDOW) || {};
+  const tabs = '<div class="tabs" role="tablist">' + windows.map(p => '<button type="button" role="tab" data-window="'
+    + esc(p.cle) + '" aria-selected="' + (p.cle === PVP_WINDOW) + '">' + esc((p.titre || [])[L] || p.cle) + "</button>").join("")
+    + '</div><p class="meta">' + esc((period.debut ? W.pvpFrom + period.debut + " · " : "") + (PVP.royaume || "")) + "</p>";
+
+  const bg = (PVP.bg || {})[PVP_WINDOW] || {};
+  const all = bg.tous || {};
+  const ar = (PVP.arenes || {})[PVP_WINDOW] || {};
+  const marks = PVP.marques || {};
+  const wins = all.victoires || {};
+  const figure = (label, value, foot) => '<div class="figure"><div class="label">' + esc(label) + '</div><div class="value num">'
+    + esc(value) + '</div><div class="foot">' + esc(foot || "") + "</div></div>";
+  const figures = '<div class="figures">'
+    + figure(W.pvpBgTitle, n(all.parties), all.parties ? n(all.joueurs_par_partie) + " " + W.pvpPerGame : "")
+    + figure(W.pvpAllianceWins, pct(wins.alliance || 0, all.parties), n(wins.alliance))
+    + figure(W.pvpHordeWins, pct(wins.horde || 0, all.parties), n(wins.horde))
+    + figure(W.pvpArenaTitle, n((ar.tous || {}).combats), W.pvpMedian + " " + secs((ar.tous || {}).duree_mediane))
+    + figure("High Risk", n((marks.high_risk || {}).total), W.pvpCharacters)
+    + figure("War Mode", n((marks.war_mode || {}).total), W.pvpCharacters)
+    + "</div>";
+
+  const sides = (a, h) => '<div class="split" style="height:8px"><i style="width:' + (a + h ? a / (a + h) * 100 : 50)
+    + '%;background:var(--alliance)"></i><i style="flex:1;background:var(--horde)"></i></div>';
+  const bgRows = ["warsong", "arathi", "alterac"].map(key => {
+    const b = bg[key] || {}, v = b.victoires || {}, k = b.coups_fatals || {};
+    const objectives = (b.objectifs || []).map(o => esc(W.pvpObjectives[o.cle] || o.cle) + ' <span class="num">'
+      + n(o.alliance) + " / " + n(o.horde) + "</span>").join("<br>");
+    return "<tr><td>" + esc(W.pvpTypes[key]) + '</td><td class="r">' + n(b.parties) + "</td><td>"
+      + (b.parties ? sides(v.alliance || 0, v.horde || 0) + '<span class="meta num">' + n(v.alliance) + " / " + n(v.horde) + "</span>" : "–")
+      + '</td><td class="r">' + n(k.alliance) + " / " + n(k.horde) + '</td><td class="meta">' + (objectives || "–") + "</td></tr>";
+  }).join("");
+  const bgCard = '<section class="card"><h2>' + esc(W.pvpBgTitle) + sub(W.pvpBgSub) + "</h2>"
+    + table([null, H(W.pvpGames, 1), H("Alliance / Horde"), H(W.pvpKills, 1), H(W.pvpObjectivesHead)], bgRows) + "</section>";
+
+  const arRows = ["2v2", "3v3", "5v5"].map(key => {
+    const a = ar[key] || {};
+    return "<tr><td>" + key + '</td><td class="r">' + n(a.combats) + '</td><td class="r">' + secs(a.duree_moyenne)
+      + '</td><td class="r">' + secs(a.duree_mediane) + '</td><td class="r">' + n(a.equipes_actives) + "</td></tr>";
+  }).join("");
+  const arCard = '<section class="card"><h2>' + esc(W.pvpArenaTitle) + sub(W.pvpArenaSub) + "</h2>"
+    + table([null, H(W.pvpFights, 1), H(W.pvpAvg, 1), H(W.pvpMedian, 1), H(W.pvpTeams, 1)], arRows) + "</section>";
+
+  const classTable = (list, kb) => {
+    if (!(list || []).length) return none;
+    const rate = c => kb ? c.kb / c.n : c.v / c.n;
+    const rows = list.filter(c => c.n).sort((a, b) => rate(b) - rate(a)).map(c => "<tr><td>" + esc(c.classe)
+      + '</td><td class="r">' + n(c.n) + "</td>" + (kb ? '<td class="r">' + (c.kb / c.n).toFixed(1) + "</td>" : "")
+      + '<td class="r">' + pct(c.v || 0, c.n) + "</td></tr>").join("");
+    return table([null, H(W.pvpPlays, 1)].concat(kb ? [H(W.pvpKills, 1)] : [], [H(W.pvpWinRate, 1)]), rows);
+  };
+  const classesGrid = '<div class="grid two"><section class="card"><h2>' + esc(W.pvpClassesTitle) + sub(W.pvpClassesSub)
+    + "</h2>" + classTable(all.classes, true) + '</section><section class="card"><h2>' + esc(W.pvpArenaClassesTitle)
+    + sub(W.pvpArenaClassesSub) + "</h2>" + classTable((ar.tous || {}).classes, false) + "</section></div>";
+
+  const ranking = PVP.classement || {};
+  const teams = ["2v2", "3v3", "5v5"].map(key => {
+    const list = (ranking[key] || {}).tete || [];
+    if (!list.length) return "";
+    return '<h2 class="later">' + key + "</h2>" + table([null, H(W.pvpTeam), H(W.pvpRating, 1), H(W.pvpGames, 1), H(W.pvpWins, 1),
+      H(W.pvpClasses)], list.map(t => '<tr><td class="rank">' + n(t.rang) + "</td><td>"
+      + esc(t.nom || (t.bots_only ? W.pvpTeamNo + t.numero : W.pvpPlayersTeam)) + '</td><td class="r">' + n(t.cote)
+      + '</td><td class="r">' + n(t.parties) + '</td><td class="r">' + n(t.victoires) + '</td><td class="meta">'
+      + esc((t.composition || []).join(", ")) + "</td></tr>").join(""));
+  }).join("");
+  const teamsCard = '<section class="card"><h2>' + esc(W.pvpTeamsTitle) + sub(W.pvpTeamsSub) + "</h2>" + (teams || none) + "</section>";
+
+  const played = (PVP.marques_periodes || {})[PVP_WINDOW] || {};
+  const markRow = (label, key) => {
+    const m = marks[key] || {}, p = played[key] || {}, b = p.bg || {}, a = p.arenes || {};
+    return "<tr><td>" + esc(label) + '</td><td class="r">' + (key === "autres" ? "–" : n(m.total)
+      + '<div class="meta">' + n(m.bots) + " " + W.pvpBots + " · " + n(m.joueurs) + " " + W.pvpPlayers + "</div>")
+      + '</td><td class="r">' + n(b.n) + '<div class="meta">' + pct(b.v || 0, b.n) + '</div></td><td class="r">' + n(a.n)
+      + '<div class="meta">' + pct(a.v || 0, a.n) + "</div></td></tr>";
+  };
+  const marksCard = '<section class="card"><h2>' + esc(W.pvpMarksTitle) + sub(W.pvpMarksSub) + "</h2>"
+    + table([null, H(W.pvpCharacters, 1), H(W.pvpBgPlayed, 1), H(W.pvpArenaPlayed, 1)],
+      markRow("High Risk", "high_risk") + markRow("War Mode", "war_mode") + markRow(W.pvpOthers, "autres")) + "</section>";
+
+  host.innerHTML = tabs + figures + '<div class="grid two">' + bgCard + arCard + "</div>" + classesGrid
+    + '<div class="grid two">' + teamsCard + marksCard + "</div>";
+  for (const button of host.querySelectorAll("[data-window]")) {
+    button.addEventListener("click", () => { PVP_WINDOW = button.dataset.window; renderPvp(); });
+  }
 }
 
 /* ---------------- live chat feed ---------------- */
