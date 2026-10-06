@@ -15,8 +15,8 @@ const WORDS = {
     tagline: "Conquest of Azeroth · bots, live",
     searchBot: "Search a bot", otherLang: "FR",
     navWorld: "World", navBots: "Bots", navStats: "Stats",
-    navChat: "Chat & Loot", navSettings: "Settings",
-    pageTitles: { world: "World", bots: "Bots", stats: "Stats",
+    navChat: "Chat & Loot", navMinds: "Minds", navSettings: "Settings",
+    pageTitles: { world: "World", bots: "Bots", stats: "Stats", minds: "Minds",
       chat: "Chat & Loot", settings: "Settings" },
     mapTitle: "Map", focusTitle: "Watching", focusNone: "Pick a bot on the map or in the Bots list to follow it here.",
     rosterTitle: "Every bot online", rosterFilter: "Filter by name, zone or class",
@@ -94,8 +94,8 @@ const WORDS = {
     tagline: "Conquest of Azeroth · bots en direct",
     searchBot: "Chercher un bot", otherLang: "EN",
     navWorld: "Monde", navBots: "Bots", navStats: "Statistiques",
-    navChat: "Chat et butin", navSettings: "Réglages",
-    pageTitles: { world: "Monde", bots: "Bots", stats: "Statistiques",
+    navChat: "Chat et butin", navMinds: "Personnalités", navSettings: "Réglages",
+    pageTitles: { world: "Monde", bots: "Bots", stats: "Statistiques", minds: "Personnalités",
       chat: "Chat et butin", settings: "Réglages" },
     mapTitle: "Carte", focusTitle: "Suivi", focusNone: "Choisissez un bot sur la carte ou dans la liste des bots pour le suivre ici.",
     rosterTitle: "Tous les bots en ligne", rosterFilter: "Filtrer par nom, zone ou classe",
@@ -216,8 +216,8 @@ function renderFooter() {
 
 /* ---------------- pages ---------------- */
 // The public copy is read-only: no settings.
-const PAGES = ["world", "bots", "stats", "chat", "settings"]
-  .filter(page => !PUBLIC || page !== "settings");
+const PAGES = ["world", "bots", "stats", "chat", "minds", "settings"]
+  .filter(page => !PUBLIC || (page !== "settings" && page !== "minds"));
 if (PUBLIC) {
   for (const node of document.querySelectorAll('.nav-link[href="#settings"]')) node.remove();
 }
@@ -834,7 +834,8 @@ function openSheet(name) {
     '<p class="who">' + esc(bot.c) + (bot.s ? " · " + esc(bot.s) : "") + " · " + esc(W[bot.r] || bot.r) +
     (bot.o ? "" : " · " + esc(W.offline)) + "</p><dl>" +
     rows.map(r => "<dt>" + esc(r[0]) + "</dt><dd>" + esc(r[1]) + "</dd>").join("") +
-    '</dl><button class="ghost close" type="button" id="sheetClose">' + esc(W.close) + "</button>";
+    "</dl>" /* private:start */ + (typeof botMindSheet === "function" ? botMindSheet(bot.n) : "") /* private:end */
+    + '<button class="ghost close" type="button" id="sheetClose">' + esc(W.close) + "</button>";
   const sheet = document.getElementById("sheet");
   document.getElementById("sheetClose").addEventListener("click", () => sheet.close());
   sheet.showModal();
@@ -1185,7 +1186,8 @@ function botCardHtml(bot, withChat) {
         + live.quests.map(q => "<li>" + esc(q) + "</li>").join("") + "</ul></div>");
     }
   }
-  /* private:start */if (withChat && !PUBLIC) rows.push(botChatHtml(bot.n));/* private:end */
+  /* private:start */if (withChat && !PUBLIC) rows.push(botChatHtml(bot.n));
+  if (!PUBLIC && typeof botMindHtml === "function") rows.push(botMindHtml(bot.n));/* private:end */
   const zoneName = zoneNameOf(bot);
   rows.push('<div class="bc-foot">' + esc(zoneName) + (zoneName ? " · " : "")
     + num(bot.k) + " kills · " + num(bot.q) + " quests · " + one(bot.g) + "g</div>");
@@ -1383,7 +1385,8 @@ function renderRoster() {
   host.innerHTML = "<table><thead><tr><th>" + esc(W.sortName) + "</th><th>" + esc(W.colClass) + '</th><th class="r">'
     + esc(W.sortLevel) + "</th><th>" + esc(W.sortZone) + "</th><th>Doing</th><th>Health</th></tr></thead><tbody>"
     + shown.map(r => '<tr data-bot="' + esc(r.bot.n) + '"' + (r.bot.n === FOCUS ? ' class="focused"' : "") + ">"
-      + "<td>" + factionDot(r.bot.f) + "<b>" + esc(r.bot.n) + "</b></td>"
+      + "<td>" + factionDot(r.bot.f) + "<b>" + esc(r.bot.n) + "</b>"
+      /* private:start */ + (typeof mindDot === "function" ? mindDot(r.bot.n) : "") /* private:end */ + "</td>"
       + '<td class="meta">' + esc(r.bot.c) + (r.bot.s ? " · " + esc(r.bot.s) : "") + "</td>"
       + '<td class="r">' + esc(r.level) + "</td>"
       + "<td>" + esc(r.zone) + "</td>"
@@ -1528,6 +1531,7 @@ const WHEN = {
   restart: "after a restart",
   "new bots": "new bots only",
   reload: "after .reload config",
+  "ollama reload": "after .ollama reload",
   live: "at once",
 };
 

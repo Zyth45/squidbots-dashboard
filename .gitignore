@@ -21,3 +21,9 @@ maps/
 ui/
 
 __pycache__/
+
+# The mind service: its database, its heartbeat, and the file of API keys (never commit that one).
+mind.sqlite
+mind.sqlite-*
+mind-status.json
+mind-secrets.json

@@ -582,6 +582,15 @@ def role_of(spec):
 def server_state():
     state = {"running": False, "ramMo": None, "crashes24h": 0, "lastCrash": None}
     try:
+        if os.name != "nt":
+            # A worldserver on Linux (or in WSL, next to a dashboard that runs there too).
+            pids = subprocess.run(["pgrep", "-x", "worldserver"], capture_output=True, text=True, timeout=5).stdout.split()
+            if pids:
+                state["running"] = True
+                rss = subprocess.run(["ps", "-o", "rss=", "-p", pids[0]], capture_output=True, text=True, timeout=5).stdout.split()
+                if rss:
+                    state["ramMo"] = int(rss[0]) // 1024
+            raise StopIteration
         if SETTINGS.get("worldserverPath"):
             # Several worldservers run on this PC: follow the one at that path.
             out = subprocess.run([POWERSHELL, "-NoProfile", "-Command",
@@ -926,7 +935,8 @@ def public_copy(data):
 PRIVATE_JS = re.compile(r"/\* private:start \*/.*?/\* private:end \*/", re.S)
 PRIVATE_HTML = re.compile(r"<!-- private:start -->.*?<!-- private:end -->", re.S)
 # Nothing of the kind may survive into a public file; publishing stops if one does.
-PRIVATE_LEFT = re.compile(r"/api/|private:(?:start|end)|id=\"(?:settings|feedCard|artPrompt|artPanel)\"")
+PRIVATE_LEFT = re.compile(r"/api/|private:(?:start|end)|id=\"(?:settings|feedCard|artPrompt|artPanel)\"|"
+                          r"data-page=\"minds\"|static/minds\.(?:js|css)")
 
 
 def public_files():
@@ -1040,6 +1050,9 @@ def config_payload():
     if any(not s["present"] for s in settings if s["file"] == botconfig.BOTMINDS):
         notes.append("LLM chat settings appear once mod-bot-minds is installed "
                      "and its mod_bot_minds.conf is in the modules folder.")
+    if any(not s["present"] for s in settings if s["file"] == botconfig.OLLAMACHAT):
+        notes.append("Minds settings appear once the mod-ollama-chat fork is installed and its "
+                     "mod_ollama_chat.conf is in the modules folder.")
     return {
         "settings": settings,
         "warnings": botconfig.override_warnings(settings),
@@ -1049,6 +1062,98 @@ def config_payload():
         "serverRunning": server_state().get("running", False),
         "notes": notes,
     }
+
+
+# The Minds page: personas, memory and LLM profiles for the bots (the mind/ package, docs/minds.md).
+# Opened on first use, so a dashboard that never shows the page never creates its database.
+MIND_API = None
+MIND_LOCK = threading.Lock()
+
+
+def resolve_character(name):
+    """(guid, name) of a character, or None. A name is letters, with Conquest of Azeroth's optional second word
+    ("Alte Bot"), so that is all the query is given."""
+    if not re.fullmatch(r"[^\W\d_]{2,12}(?: [^\W\d_]{2,12})?", name or ""):
+        return None
+    rows = mysql("SELECT guid, name FROM %s.characters WHERE name = '%s' LIMIT 1" % (DB["characters"], name))
+    return (int(rows[0][0]), rows[0][1]) if rows else None
+
+
+# What GET /api/mind/... answers, each as (api, query-parameter getter) -> JSON.
+JEV_PRICE_PER_M = 0.042   # TypeSafe's list price, dollars per million input tokens (its answers are free)
+
+
+def jev_status(api, hours=24):
+    """What Jev (TypeSafe's decision model) is doing for the module and what it saves, from the module's own audit rows.
+
+    Two places use it: the tactical loop (each awake bot's look-around, `mod_ollama_chat_tactical_audit`) and the short-command
+    classifier (`mod_ollama_chat_gateway_audit`, source_channel gw_classifier). Each audit row records which backend decided.
+    A tick Jev was unsure about is decided by the language model and recorded as that, so Jev's own spend on those is not
+    counted here: the figures lean a little in Jev's favour.
+    """
+    try:
+        hours = max(1, min(int(hours), 24 * 30))
+    except (TypeError, ValueError):
+        hours = 24
+    values = {row["key"]: row["value"] for row in botconfig.read_settings(CONFIG_DIR)}
+    enabled = {"jev": values.get("OllamaChat.Jev.Enable") == "1",
+               "tactical": values.get("OllamaChat.Jev.Tactical.Enable") == "1",
+               "classifier": values.get("OllamaChat.Jev.Classifier.Enable") == "1"}
+    out = {"hours": hours, "enabled": enabled, "price_per_m": JEV_PRICE_PER_M, "sites": {}}
+    queries = {
+        "tactical": "SELECT IFNULL(backend, 'llm'), COUNT(*), IFNULL(ROUND(AVG(latency_ms)), 0), IFNULL(SUM(prompt_tokens), 0) "
+                    "FROM {characters}.mod_ollama_chat_tactical_audit WHERE ts >= NOW() - INTERVAL %d HOUR GROUP BY 1",
+        "classifier": "SELECT IFNULL(backend, 'llm'), COUNT(*), IFNULL(ROUND(AVG(latency_ms)), 0), IFNULL(SUM(prompt_tokens), 0) "
+                      "FROM {characters}.mod_ollama_chat_gateway_audit WHERE source_channel = 'gw_classifier' "
+                      "AND ts >= NOW() - INTERVAL %d HOUR GROUP BY 1",
+    }
+    for site, query in queries.items():
+        try:
+            rows = mysql(query.format(**DB) % hours)
+        except (RuntimeError, OSError, subprocess.SubprocessError) as error:
+            out["sites"][site] = {"error": str(error)[:200]}
+            continue
+        by_backend = {row[0]: {"calls": int(row[1]), "ms": int(float(row[2])), "tokens": int(float(row[3]))} for row in rows}
+        out["sites"][site] = {"jev": by_backend.get("jev", {"calls": 0, "ms": 0, "tokens": 0}),
+                              "llm": by_backend.get("llm", {"calls": 0, "ms": 0, "tokens": 0})}
+    with api.store.conn() as db:
+        row = db.execute("SELECT AVG(cost_usd) AS cost, COUNT(*) AS n FROM call_log WHERE lane = 'fast' AND ok = 1 AND ts >= ?",
+                         (time.time() - hours * 3600,)).fetchone()
+    # What one decision costs on the language model (the quick-decision lane's average over the same hours).
+    out["llm_cost_per_call"] = float(row["cost"] or 0)
+    decided = sum(site["jev"]["calls"] for site in out["sites"].values() if "jev" in site)
+    tokens = sum(site["jev"]["tokens"] for site in out["sites"].values() if "jev" in site)
+    out["jev_calls"] = decided
+    out["jev_cost"] = tokens * JEV_PRICE_PER_M / 1e6
+    out["displaced_cost"] = decided * out["llm_cost_per_call"]
+    out["saved"] = out["displaced_cost"] - out["jev_cost"]
+    return out
+
+
+MIND_READS = {
+    "/api/mind/jev": lambda api, q: jev_status(api, q("hours") or 24),
+    "/api/mind": lambda api, q: api.overview(),
+    "/api/mind/cards": lambda api, q: api.cards(),
+    "/api/mind/bot": lambda api, q: api.bot(name=q("name")),
+    "/api/mind/personas": lambda api, q: api.personas(q("q")),
+    "/api/mind/rp": lambda api, q: api.rp_characters(q("q")),
+    "/api/mind/rp/character": lambda api, q: api.rp_character(name=q("name")),
+    "/api/mind/turns": lambda api, q: api.turns(q("bot") or None, q("player") or None, q("before") or None,
+                                                q("limit") or 50, q("problems") == "1"),
+    "/api/mind/turn": lambda api, q: api.turn(q("id")),
+    "/api/mind/analytics": lambda api, q: api.analytics(q("days") or 14),
+    "/api/mind/export": lambda api, q: api.export(q("full") == "1"),
+}
+
+
+def mind_api():
+    global MIND_API
+    with MIND_LOCK:
+        if MIND_API is None:
+            from mind import api, config, store
+            settings = config.load(SETTINGS_FILE)
+            MIND_API = api.Api(store.Store(settings["db"]), settings, resolve_character)
+        return MIND_API
 
 
 # The maps: tools/gen_art.py reads the player's own client and writes maps/ (maps only,
@@ -1183,6 +1288,17 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return False
         return True
 
+    def _mind(self, call):
+        from mind.api import ApiError
+        try:
+            self._json(call(mind_api()))
+        except ApiError as error:
+            self._json({"error": str(error)}, error.status)
+        except (ValueError, TypeError) as error:  # a malformed number in the query or body
+            self._json({"error": "bad request: %s" % error}, 400)
+        except Exception as error:               # noqa: BLE001 - report, never 500 blindly
+            self._json({"error": "%s: %s" % (type(error).__name__, error)}, 500)
+
     def do_GET(self):
         if not self._own_host():
             return
@@ -1195,6 +1311,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self._json(art_status())
         elif path == "/api/live":
             self._send(live_status_body(), "application/json; charset=utf-8")
+        elif path in MIND_READS:
+            query = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
+            first = lambda key: (query.get(key) or [""])[0]  # noqa: E731
+            self._mind(lambda api: MIND_READS[path](api, first))
         elif path == "/api/chat":
             query = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
             first = lambda key: (query.get(key) or [None])[0]  # noqa: E731
@@ -1269,6 +1389,17 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 self._json({"error": problem}, 400)
                 return
             self._json(art_status())
+            return
+        if path == "/api/mind":
+            if not self._local_only():
+                return
+            try:
+                length = int(self.headers.get("Content-Length") or 0)
+                body = json.loads(self.rfile.read(length).decode("utf-8")) if length else {}
+            except ValueError:
+                self._json({"error": "expected a JSON object"}, 400)
+                return
+            self._mind(lambda api: api.apply(body))
             return
         if path != "/api/config":
             self.send_error(404)

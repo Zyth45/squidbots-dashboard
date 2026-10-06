@@ -18,6 +18,7 @@ import shutil
 PLAYERBOTS = "playerbots.conf"
 DYNAMICXP = "dynamicxp.conf"
 BOTMINDS = "mod_bot_minds.conf"
+OLLAMACHAT = "mod_ollama_chat.conf"     # the mod-ollama-chat fork that the mind service (mind/) serves
 
 # The curated set. `when` says when a change is actually seen, in the page's terms:
 #
@@ -148,6 +149,114 @@ SETTINGS = [Setting(*row) for row in (
      "How many bot lines the model writes at the same time. Higher answers faster but loads the machine."),
     ("BotMinds.Limits.MaxCallsPerMinute", BOTMINDS, "Bot chat (LLM)", "Lines per minute, whole realm", "int", None, "restart",
      "A ceiling on model calls per minute across every bot. 0 removes the ceiling."),
+
+    # Bot personalities and memory: the mod-ollama-chat fork, answered by the mind service (mind/, docs/minds.md).
+    # The Minds page holds everything that can change while the server runs; these are the module's own switches.
+    ("OllamaChat.Gateway.Enable", OLLAMACHAT, "Minds (mod-ollama-chat)", "Bots talk with a language model", "bool", None, "ollama reload",
+     "Master switch for conversations. Off: bots stay ordinary playerbots."),
+    ("OllamaChat.Gateway.Url", OLLAMACHAT, "Minds (mod-ollama-chat)", "Mind service address", "quoted", None, "ollama reload",
+     "Where conversations are sent. The mind service on this machine listens at http://127.0.0.1:18800/v1/chat/completions."),
+    ("OllamaChat.EnableWhisperReplies", OLLAMACHAT, "Minds (mod-ollama-chat)", "Bots answer whispers", "bool", None, "ollama reload",
+     "Upstream ships this off, and with it off a whisper to a bot is ignored whatever else is switched on."),
+    ("OllamaChat.AnswerAddressedInCombat", OLLAMACHAT, "Minds (mod-ollama-chat)", "A bot you speak to answers even in a fight", "bool", None, "ollama reload",
+     "Bots that hunt are in combat most of the time. On: a bot you whisper or call by name still answers; unprompted chatter waits for the fight to end. Off: it stays silent until it is out of combat."),
+    ("OllamaChat.Gateway.MinSecondsBetweenRequests", OLLAMACHAT, "Minds (mod-ollama-chat)", "Least seconds between your messages to one bot", "int", None, "ollama reload",
+     "A message that arrives sooner than this after your last one to the same bot is dropped without a word. Upstream ships 5, which loses ordinary quick replies; 2 protects the budget without that. 0 removes the limit."),
+    ("OllamaChat.Gateway.MaxToolIterations", OLLAMACHAT, "Minds (mod-ollama-chat)", "Most tool steps a bot takes per message", "int", None, "ollama reload",
+     "Looking up gear, then bags, then acting is several steps. Upstream ships 3, and a bot that runs out says nothing at all. The mind service also withdraws the tools after its own limit, so a high number cannot loop forever."),
+    ("OllamaChat.Gateway.Type", OLLAMACHAT, "Minds (mod-ollama-chat)", "Backend type", "quoted", None, "ollama reload",
+     "synthiq lets a bot call the game itself (bags, gear, quests, invites). The mind service needs it. openclaw ignores tools."),
+    ("OllamaChat.Gateway.EnableToolUse", OLLAMACHAT, "Minds (mod-ollama-chat)", "Bots may use game tools", "bool", None, "ollama reload",
+     "Lets the model look at a bot's real bags, gear and quests and act (invite you, sell junk) instead of guessing."),
+    ("OllamaChat.Mcp.AllowActionTools", OLLAMACHAT, "Minds (mod-ollama-chat)", "Bots may act when asked", "bool", None, "ollama reload",
+     "Lets an awake bot do things, not just talk: invite you, follow, stay, sell junk, use an item, cast. Only players on the whitelist can ask. Off: it can look at its bags and quests but not act."),
+    ("OllamaChat.Mcp.ActionRateLimitPerBotPerMinute", OLLAMACHAT, "Minds (mod-ollama-chat)", "Actions per bot per minute", "int", None, "ollama reload",
+     "A ceiling on how often one bot may act, so a confused model cannot loop."),
+    ("OllamaChat.Gateway.InjectIdentity", OLLAMACHAT, "Minds (mod-ollama-chat)", "Tell the model who is talking", "bool", None, "ollama reload",
+     "Puts the bot's and the player's guid and name in every request. Without it the mind service cannot tell players apart and remembers nothing."),
+    ("OllamaChat.Gateway.MergePersonalityPrompt", OLLAMACHAT, "Minds (mod-ollama-chat)", "Also use the module's own personality templates", "bool", None, "ollama reload",
+     "Off while the mind service writes personalities: two personalities in one prompt contradict each other."),
+    ("OllamaChat.Gateway.TriggerKeyword", OLLAMACHAT, "Minds (mod-ollama-chat)", "Word a message must contain", "quoted", None, "ollama reload",
+     "Upstream ships \"claude\": a whisper is ignored unless it contains that word. Empty means every whisper to a bot is heard."),
+    ("OllamaChat.Gateway.WhitelistAccountIds", OLLAMACHAT, "Minds (mod-ollama-chat)", "Accounts that can wake bots", "quoted", None, "ollama reload",
+     "Account ids separated by commas (the id column of acore_auth.account). Only these players can start a bot talking. Empty: nobody can, which keeps a busy realm from spending your model budget."),
+    ("OllamaChat.Gateway.Promote.Enable", OLLAMACHAT, "Minds (mod-ollama-chat)", "Any bot wakes when you talk to it", "bool", None, "ollama reload",
+     "Whisper a bot or say its name and it answers as itself for a while; invite it and it stays awake as a companion until you remove it. Everyone else stays an ordinary bot."),
+    ("OllamaChat.Gateway.Promote.ChatTtlSec", OLLAMACHAT, "Minds (mod-ollama-chat)", "A bot stays awake after your last word (seconds)", "int", None, "ollama reload",
+     "How long a bot you only talked to keeps answering. Bots in your group do not time out."),
+    ("OllamaChat.Gateway.Promote.MaxChatBots", OLLAMACHAT, "Minds (mod-ollama-chat)", "Most bots awake at once from chat", "int", None, "ollama reload",
+     "Beyond this the bot you spoke to longest ago goes back to sleep. Group members do not count."),
+    ("OllamaChat.Gateway.Promote.Channels", OLLAMACHAT, "Minds (mod-ollama-chat)", "Where naming a bot wakes it", "quoted", None, "ollama reload",
+     "Comma separated: whisper, party, raid, guild, officer, say, yell, general. General is answered by whisper so a long reply does not flood the channel."),
+    ("OllamaChat.Ambient.Enable", OLLAMACHAT, "Minds (mod-ollama-chat)", "Bots answer a hello nearby", "bool", None, "ollama reload",
+     "Say hi in /say, /yell, the zone channel, Trade or LFG without naming anyone and the bots in earshot answer in their own voices, and sometimes each other. Only whitelisted players start it. Uses the Ambient chat model (or Quick decisions): a few tenths of a cent a line."),
+    ("OllamaChat.MaxBotsToPick", OLLAMACHAT, "Minds (mod-ollama-chat)", "Most bots that answer one line", "int", None, "ollama reload",
+     "A random number from 1 up to this many of the bots in earshot answer a line. 3 or 4 feels like a street; 1 like a single stranger."),
+    ("OllamaChat.Ambient.ChainChance", OLLAMACHAT, "Minds (mod-ollama-chat)", "Chance a bot answers another bot's line (%)", "int", None, "ollama reload",
+     "After a bot answers you, each other bot in earshot has this chance to answer that answer, so they talk among themselves."),
+    ("OllamaChat.Ambient.ChainMaxDepth", OLLAMACHAT, "Minds (mod-ollama-chat)", "How many bot-to-bot replies deep", "int", None, "ollama reload",
+     "2 lets a bot answer you, another answer it, and a third answer that; then it stops."),
+    ("OllamaChat.Ambient.MaxLinesPerScene", OLLAMACHAT, "Minds (mod-ollama-chat)", "Most lines in one conversation", "int", None, "ollama reload",
+     "A ceiling on the whole exchange after one line of yours, so a busy street does not fill your chat window."),
+    ("OllamaChat.Ambient.BotCooldownSec", OLLAMACHAT, "Minds (mod-ollama-chat)", "A bot speaks at most once every (seconds)", "int", None, "ollama reload",
+     "Keeps one bot from answering everything."),
+    ("OllamaChat.Ambient.Channels", OLLAMACHAT, "Minds (mod-ollama-chat)", "Where bots answer a hello", "quoted", None, "ollama reload",
+     "Comma separated: say, yell, zone, trade, lfg, world."),
+    ("OllamaChat.Ambient.RewriteStockLines", OLLAMACHAT, "Minds (mod-ollama-chat)", "Bots say their stock chatter in their own words", "bool", None, "ollama reload",
+     "The ready-made lines playerbots posts in General, Trade and /say (\"Took [quest]. Time to dive in.\", \"WTS Cloth\") are held back and said again in the bot's own personality, with item and quest links kept, whenever a whitelisted player is near. Nobody near: nothing changes."),
+    ("OllamaChat.Ambient.RewriteRangeYards", OLLAMACHAT, "Minds (mod-ollama-chat)", "Rewrite stock chatter within (yards) of you", "int", None, "ollama reload",
+     "Only bots this close to a whitelisted player pay for a rewrite; the rest stay stock."),
+    ("OllamaChat.Ambient.RewriteScenePercent", OLLAMACHAT, "Minds (mod-ollama-chat)", "Chance a rewritten remark starts a chat (%)", "int", None, "ollama reload",
+     "Bots nearby may answer the remark, and each other, for up to 45 seconds."),
+    ("OllamaChat.Ambient.SceneWindowSec", OLLAMACHAT, "Minds (mod-ollama-chat)", "Bots keep talking among themselves for (seconds)", "int", None, "ollama reload",
+     "After a line of yours, the bots there may go on answering each other for this long."),
+    ("OllamaChat.Ambient.StaggerMs", OLLAMACHAT, "Minds (mod-ollama-chat)", "Gap between bots answering the same line (ms)", "int", None, "ollama reload",
+     "Bots that heard the same line answer one after another at about this interval, plus typing time."),
+    ("OllamaChat.Ambient.MaxLineChars", OLLAMACHAT, "Minds (mod-ollama-chat)", "Longest ambient chat line (characters)", "int", None, "ollama reload",
+     "A chat line holds 255. Real players type short lines: 110 keeps them that way."),
+    ("OllamaChat.Jev.Enable", OLLAMACHAT, "Minds (mod-ollama-chat)", "Jev: use TypeSafe's decision model", "bool", None, "restart",
+     "Jev picks between options in about 0.4 s for a fraction of a cent and cannot write text. It takes routine decisions off the language model; anything it is unsure of goes to the model as before. Needs a TypeSafe key in the server's environment (AC_OLLAMA_CHAT_JEV_API_KEY): never put it in a config file. See the Jev card on the Minds page for what it saves."),
+    ("OllamaChat.Jev.Tactical.Enable", OLLAMACHAT, "Minds (mod-ollama-chat)", "Jev decides awake bots' routine looks-around", "bool", None, "ollama reload",
+     "The tactical loop's most common answer is 'nothing to do'. Jev makes that call; the model handles anything else."),
+    ("OllamaChat.Jev.Tactical.MinConfidence", OLLAMACHAT, "Minds (mod-ollama-chat)", "How sure Jev must be to decide a look-around", "float", None, "ollama reload",
+     "0 to 1. Lower lets Jev decide more (cheaper); higher hands more to the model."),
+    ("OllamaChat.Jev.Classifier.Enable", OLLAMACHAT, "Minds (mod-ollama-chat)", "Jev handles short commands", "bool", None, "ollama reload",
+     "A short command to a bot (invite me, follow, stay) is read by Jev instead of the model's full conversation call, and acted on when Jev is sure."),
+    ("OllamaChat.Jev.Classifier.MinConfidence", OLLAMACHAT, "Minds (mod-ollama-chat)", "How sure Jev must be to act on a command", "float", None, "ollama reload",
+     "0 to 1. The shipped 0.8 acts only when Jev is quite sure; a command it doubts goes to the bot's normal conversation."),
+    ("OllamaChat.Jev.TimeoutMs", OLLAMACHAT, "Minds (mod-ollama-chat)", "Longest Jev may take (ms)", "int", None, "ollama reload",
+     "Past this the decision goes to the language model."),
+    ("OllamaChat.LocalChannelNames", OLLAMACHAT, "Minds (mod-ollama-chat)", "Zone channels (a bot must be in your zone)", "quoted", None, "ollama reload",
+     "Channel names, comma separated, that only reach bots in the same zone as you. Conquest of Azeroth's per-zone channel is \"Zone - <place>\", so it needs Zone -."),
+    ("OllamaChat.GlobalChannelNames", OLLAMACHAT, "Minds (mod-ollama-chat)", "Realm-wide channels", "quoted", None, "ollama reload",
+     "Channel names, comma separated, that reach bots in any zone. Conquest of Azeroth's realm channel is Ascension."),
+    ("OllamaChat.Tactical.Enable", OLLAMACHAT, "Minds (mod-ollama-chat)", "Awake bots react to what happens", "bool", None, "ollama reload",
+     "A small, frequent model call per awake bot near you: short remarks, emotes, ready checks. Uses the quick-decision model."),
+    ("OllamaChat.Tactical.AmbientEnable", OLLAMACHAT, "Minds (mod-ollama-chat)", "Awake bots make idle remarks", "bool", None, "ollama reload",
+     "Contextual emotes and short lines while a real player is near. Silent when nobody is there to hear it."),
+    ("OllamaChat.Tactical.Url", OLLAMACHAT, "Minds (mod-ollama-chat)", "Quick-decision address", "quoted", None, "ollama reload",
+     "The mind service's fast lane: http://127.0.0.1:18800/fast/v1/chat/completions."),
+    ("OllamaChat.Tactical.HeartbeatMs", OLLAMACHAT, "Minds (mod-ollama-chat)", "Awake bots look around every (ms)", "int", None, "restart",
+     "How often each awake bot near you makes a quick-decision call. 10000 is about one call every 10 seconds, roughly 3,000 tokens each: the main running cost of a bot in your party. Raise it to spend less; the bot then reacts more slowly."),
+    ("OllamaChat.Tactical.NearbyBotRadius", OLLAMACHAT, "Minds (mod-ollama-chat)", "Awake bots within (yards)", "float", None, "ollama reload",
+     "Bots this close to a whitelisted player join the quick-decision loop."),
+    ("OllamaChat.Tactical.MaxConcurrentQueries", OLLAMACHAT, "Minds (mod-ollama-chat)", "Quick-decision calls in flight at once", "int", None, "ollama reload",
+     "The nearby bots' calls in one look-around share a 5 second budget. With 1 they queue behind each other and the last ones time out before they are sent (a third of the calls failed on the test realm with five bots near). Use about as many as the most nearby bots; 1 is only right for a single local GPU."),
+    ("OllamaChat.Tactical.NearbyBotMax", OLLAMACHAT, "Minds (mod-ollama-chat)", "Most nearby bots in that loop", "int", None, "ollama reload",
+     "A cap on the model calls the nearby bots cost."),
+    ("OllamaChat.Tactical.AmbientMaxVisibleActionsPerMinute", OLLAMACHAT, "Minds (mod-ollama-chat)", "Idle remarks per bot per minute", "int", None, "ollama reload",
+     "So a bot never floods the screen. 0 removes the cap."),
+    # The combat director (docs/director.md in the synthiqbots fork): Jev picks the fight's targets, playerbots still fights.
+    ("OllamaChat.Director.Enable", OLLAMACHAT, "Minds (mod-ollama-chat)", "Companions fight as a team", "bool", None, "ollama reload",
+     "While your party fights, a quick decision model picks the enemy to kill first (a skull appears on it), whether to crowd-control one, and whether the healers should ration mana. The bots still do the fighting, and a mark you put up yourself is left alone. Needs Jev on. Off: every bot picks its own target."),
+    ("OllamaChat.Jev.Director.Enable", OLLAMACHAT, "Minds (mod-ollama-chat)", "Jev picks the fight's targets", "bool", None, "ollama reload",
+     "The director's decisions come from Jev: about 0.3 seconds and 0.005 cents each, one every 2.5 seconds of a real fight."),
+    ("OllamaChat.Jev.Director.MinConfidence", OLLAMACHAT, "Minds (mod-ollama-chat)", "How sure Jev must be to pick a target", "float", None, "ollama reload",
+     "0 to 1. The shipped 0.6 acts only on a clear call; an unsure answer leaves the bots choosing for themselves."),
+    ("OllamaChat.Director.Announce", OLLAMACHAT, "Minds (mod-ollama-chat)", "A companion says the plan in party chat", "bool", None, "ollama reload",
+     "\"Focus the Defias Conjurer\", in that bot's own voice, at most once every 8 seconds. Off: the skull appears and nobody says anything."),
+    ("OllamaChat.Director.CrowdControl", OLLAMACHAT, "Minds (mod-ollama-chat)", "The director may crowd-control an enemy", "bool", None, "ollama reload",
+     "Only for the classes whose crowd control the bots aim at the moon mark: mage, rogue, hunter, warlock and druid. Conquest of Azeroth's own classes ignore it."),
 )]
 
 BY_KEY = {entry.key: entry for entry in SETTINGS}
@@ -172,6 +281,10 @@ ADDABLE = {
 
 _CHANCES = ["AiPlayerbot.RandomBotMinLevelChance", "AiPlayerbot.RandomBotMaxLevelChance"]
 _LLM = [s.key for s in SETTINGS if s.file == BOTMINDS and s.key != "BotMinds.Enable"]
+# The director needs Jev, not the language-model gateway, so the "bots are not talking" warning does not apply to it.
+_MINDS = [s.key for s in SETTINGS if s.file == OLLAMACHAT and s.key != "OllamaChat.Gateway.Enable"
+          and not s.key.startswith(("OllamaChat.Director.", "OllamaChat.Jev.Director."))]
+_WAKING = [s.key for s in SETTINGS if s.key.startswith("OllamaChat.Gateway.Promote.")]
 
 # When every "if" setting has the given value, each "warn" setting shows the text.
 # The page evaluates this same table as values are edited, so the rules live once.
@@ -198,6 +311,27 @@ OVERRIDES = [
     {"if": {"BotMinds.Enable": "0"},
      "warn": _LLM,
      "text": "LLM chat is off, so this has no effect."},
+    {"if": {"OllamaChat.Gateway.Enable": "0"},
+     "warn": _MINDS,
+     "text": "Bots are not talking with a language model (the first setting in this group is off), so this has no effect."},
+    {"if": {"OllamaChat.Gateway.WhitelistAccountIds": ""},
+     "warn": _WAKING,
+     "text": "Nobody is listed under \"Accounts that can wake bots\", and with an empty list waking is switched off: no bot will answer anyone."},
+    {"if": {"OllamaChat.EnableWhisperReplies": "0", "OllamaChat.Gateway.Enable": "1"},
+     "warn": ["OllamaChat.EnableWhisperReplies"],
+     "text": "Off: a whisper to a bot is ignored, so the most direct way to talk to one does nothing."},
+    {"if": {"OllamaChat.Gateway.EnableToolUse": "1", "OllamaChat.Gateway.Type": "openclaw"},
+     "warn": ["OllamaChat.Gateway.EnableToolUse"],
+     "text": "Tools are only sent to backend type synthiq. With openclaw they are ignored."},
+    {"if": {"OllamaChat.Director.Enable": "1", "OllamaChat.Jev.Enable": "0"},
+     "warn": ["OllamaChat.Director.Enable"],
+     "text": "Jev is off, and the director's decisions come from Jev, so it does nothing."},
+    {"if": {"OllamaChat.Director.Enable": "1", "OllamaChat.Jev.Director.Enable": "0"},
+     "warn": ["OllamaChat.Director.Enable"],
+     "text": "\"Jev picks the fight's targets\" is off, so the director has nobody to ask and does nothing."},
+    {"if": {"OllamaChat.Gateway.InjectIdentity": "0", "OllamaChat.Gateway.Enable": "1"},
+     "warn": ["OllamaChat.Gateway.InjectIdentity"],
+     "text": "Off: the mind service cannot tell players apart, so bots remember nothing between conversations."},
 ]
 
 # A recipe is a named set of changes, shown as a before and after list first.
@@ -233,6 +367,35 @@ RECIPES.insert(0, {
                 "AiPlayerbot.CoaSpecRotations": "1", "AiPlayerbot.CoaExcludedSpecializations": "99",
                 "AiPlayerbot.CoaGroupTelemetry": "0", "AiPlayerbot.CoaLfgBots": "1"},
     "after": "Takes effect at the next server start."})
+RECIPES.insert(1, {
+    "id": "minds-on",
+    "title": "Minds on: bots with personalities and memory",
+    "summary": "Points the module at the mind service on this machine (python run-mind.py) and switches on tools, waking a bot "
+               "by talking to it, and the player identity the memory needs. It leaves the whitelist alone: add your account id "
+               "under Minds afterwards, or no bot will wake.",
+    "changes": {"OllamaChat.Gateway.Enable": "1", "OllamaChat.EnableWhisperReplies": "1", "OllamaChat.AnswerAddressedInCombat": "1",
+                "OllamaChat.Gateway.MinSecondsBetweenRequests": "2",
+                "OllamaChat.Gateway.MaxToolIterations": "50",
+                "OllamaChat.Gateway.Type": "synthiq",
+                "OllamaChat.Gateway.Url": "http://127.0.0.1:18800/v1/chat/completions",
+                "OllamaChat.Gateway.EnableToolUse": "1", "OllamaChat.Mcp.AllowActionTools": "1",
+                "OllamaChat.Gateway.InjectIdentity": "1", "OllamaChat.Gateway.TriggerKeyword": "",
+                "OllamaChat.Gateway.MergePersonalityPrompt": "0", "OllamaChat.Gateway.Promote.Enable": "1",
+                "OllamaChat.Ambient.Enable": "1", "OllamaChat.Ambient.RewriteStockLines": "1", "OllamaChat.MaxBotsToPick": "3",
+                "OllamaChat.LocalChannelNames": "General -,Trade -,LocalDefense -,Zone -",
+                "OllamaChat.GlobalChannelNames": "World,LookingForGroup,Ascension",
+                "OllamaChat.Tactical.Enable": "1",
+                "OllamaChat.Tactical.Url": "http://127.0.0.1:18800/fast/v1/chat/completions",
+                "OllamaChat.Tactical.MaxConcurrentQueries": "4",
+                "AiPlayerbot.RandomBotTalk": "0"},
+    "after": "Type .ollama reload in game or restart the server. Then choose a model on the Minds page and press Test."})
+RECIPES.insert(2, {
+    "id": "director-on",
+    "title": "Combat director: the party fights as a team",
+    "summary": "Switches on Jev and the director. While you fight with companions, Jev picks the enemy to kill first (a skull appears on "
+               "it), and a companion says so in party chat. Playerbots still does the fighting.",
+    "changes": {"OllamaChat.Jev.Enable": "1", "OllamaChat.Jev.Director.Enable": "1", "OllamaChat.Director.Enable": "1"},
+    "after": "Jev needs a TypeSafe key (see the module's docs/jev.md). Restart the server, or type .ollama reload if Jev was already on."})
 _RECIPES = {recipe["id"]: recipe for recipe in RECIPES}
 
 
