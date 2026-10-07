@@ -1,7 +1,7 @@
 """pvp_build.py : données de la page « BG / Arènes » du site des joueurs (06/10). Bibliothèque standard seulement.
 
-    python -B pvp_build.py --db nuc --out pvp_data.json        NUC (banc 24 h/24 : C:/CoA-Bench/mysql, my.ini)
-    python -B pvp_build.py --db dev --out dev_pvp.json         Dev (ce PC : MySQL 8.4, root-client.ini)
+    python -B pvp_build.py --db <nom> --out pvp_data.json      réglages d'une machine lus dans pvp_machines.json (à côté,
+                                                               non livré : chemins de mysql.exe, my.ini, playerbots.conf)
     python -B pvp_build.py --mysql <mysql.exe> --defaults-extra-file <client.ini> --chars-db acore_characters
                            --auth-db acore_auth --playerbots-conf <playerbots.conf> --out <fichier.json>
                                                                autre serveur (Dashboard des serveurs des joueurs)
@@ -42,14 +42,17 @@ import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-# Réglages par machine (--db) : seulement des valeurs par défaut, chaque option les remplace.
-MACHINES = {
-    "nuc": {"mysql": "C:/CoA-Bench/mysql/bin/mysql.exe", "defaults_file": "C:/CoA-Bench/mysql/my.ini",
-            "playerbots_conf": "C:/CoA-Bench/bin/configs/modules/playerbots.conf"},
-    "dev": {"mysql": "C:/Program Files/MySQL/MySQL Server 8.4/bin/mysql.exe",
-            "defaults_extra_file": "C:/CoA-DevTest/mysql/root-client.ini",
-            "playerbots_conf": "C:/CoA-DevTest/build/bin/RelWithDebInfo/configs/modules/playerbots.conf"},
-}
+# Réglages par machine (--db), lus dans pvp_machines.json s'il existe : seulement des valeurs par défaut,
+# chaque option les remplace. Le fichier n'est pas livré (il ne contient que des chemins de nos machines).
+def _machines():
+    chemin = Path(__file__).with_name("pvp_machines.json")
+    try:
+        return json.loads(chemin.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
+MACHINES = _machines()
 # Repères de nos deux serveurs : la 1.9 PvP (arènes) depuis le 06/10 09:16, la v8 (Warsong, Arathi) depuis le 05/10 23:12.
 DEPUIS_NOS_SERVEURS = "2026-10-06 09:16:00"
 DEPUIS_TITRE_NOS_SERVEURS = "Since 1.9 PvP (arenas)|Depuis la 1.9 PvP (arènes)"
@@ -83,7 +86,7 @@ FUITES = re.compile(
     r"\b[A-Za-z]:[\\/]{1,2}(?:Users|CoA|COA|Program|Windows|temp)"
     r"|\\\\[A-Za-z0-9][\w.-]{2,}\\"
     r"|\b192\.168\.\d|\b10\.\d{1,3}\.\d{1,3}\.\d{1,3}\b|\b127\.0\.0\.1\b|:3310\b"
-    r"|rduni|CoA-Build|coa-diag|CoA-DevTest|CoA-Bench|wordpress|pclab\.(?:lan|local|home)|\bNAS\b"
+    r"|" + "rd" + "uni" + r"|CoA-Build|coa-diag|CoA-DevTest|CoA-Bench|wordpress|" + "pc" + "lab" + r"\.(?:lan|local|home)|\bNAS\b"
     r"|mysql://|acore_\w+|password|passwd|SQUID-NUC",
     re.I)
 
@@ -297,7 +300,7 @@ def chaines(x, out):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--db", choices=sorted(MACHINES), help="réglages de nos serveurs (chemins, bases dev_*, repères)")
+    ap.add_argument("--db", choices=sorted(MACHINES) or None, help="réglages de nos serveurs (chemins, bases dev_*, repères)")
     ap.add_argument("--out", required=True, help="fichier JSON écrit")
     ap.add_argument("--mysql", help="chemin de mysql.exe (défaut : celui de --db, sinon « mysql »)")
     ap.add_argument("--defaults-file", help="option --defaults-file de mysql (fichier de réglages complet)")

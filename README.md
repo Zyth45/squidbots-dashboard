@@ -27,6 +27,17 @@ own map, a bot for its card), and the bot you follow, live: the page at the top 
 | ![Chat and loot](docs/chat.png) | ![Settings](docs/settings.png) |
 | The live chat feed (private version; searchable, every 5 s), the most talkative bots, and the epics and rares they find. | The bot settings that matter, in plain words, with a warning when another setting cancels one out, and one-click recipes such as *CoA Bots v1.4: the recommended settings*. |
 
+**PvP** — battlegrounds by type (games, wins per side, objectives, killing blows), arenas by
+bracket (fights, average and median length), classes in battlegrounds and arenas, the top arena
+teams, and the High Risk and War Mode characters, over the last 24 hours and since a date you pick
+(`pvpSince` in `dashboard.json`; without it, the whole history). No character is named: a team
+keeps its name only when all its members are random bots, otherwise it shows as a players' team.
+
+**The bots' chat language**, on the Chat & Loot page (private version): what bots say on their
+own in the channels, in say and in whispers comes from the server's translated lines
+(`AiPlayerbot.BotTextLocale`). Pick Auto (the players' game client), English, Français, Deutsch,
+Español or Русский; it applies when the game server restarts. No AI involved.
+
 <img src="docs/card.png" align="right" width="230" alt="A bot's card">
 
 **Every bot has a card.** Click it on the map, in the list or through the search box: class and
@@ -108,7 +119,8 @@ Logger.chat.guild = 4,Chat
 
 It changes values in the module `.conf` files (`playerbots.conf`, `dynamicxp.conf`, and
 `mod_bot_minds.conf` when [mod-bot-minds](https://github.com/vedicveko/mod-bot-minds) is
-installed). It edits values in place, never adds or reorders lines, and backs the whole file up to
+installed). It edits values in place and never reorders lines; the only line it may add is the bots'
+chat language, at the end of `playerbots.conf`, when an older file lacks it. It backs the whole file up to
 `config-backups/` first. Each setting says when a change takes effect. The server reads these
 files at startup, so it is easiest to use with the server stopped. Writes are accepted from the
 machine itself only, from the dashboard's own page. The dashboard never writes to the game database.

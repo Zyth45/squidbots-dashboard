@@ -22,3 +22,5 @@ ui/
 
 __pycache__/
 pvp.json
+# Presets of our own machines for tools/pvp_build.py --db: local paths, never shipped.
+tools/pvp_machines.json
