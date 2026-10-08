@@ -448,6 +448,43 @@ def load_live():
         return _LIVE_CACHE["at"], _LIVE_CACHE["parsed"], _LIVE_CACHE["bots"]
 
 
+# Creatures killed: the core keeps no achievement progress for bots (criteria 5529 stays empty), so the
+# module counts each bot's killing blows since the server started ("k" in bot-status.json). That count
+# starts again at every restart; kills.json keeps the running total per bot across restarts.
+KILLS_FILE = os.path.join(HERE, "kills.json")
+
+
+class KillTally:
+    def __init__(self):
+        self.lock = threading.Lock()
+        self.saved = 0.0
+        try:
+            self.bots = json.load(open(KILLS_FILE, encoding="utf-8")).get("bots", {})
+        except (OSError, ValueError):
+            self.bots = {}
+
+    def update(self):
+        """{name: kills} after reading the latest snapshot."""
+        live = load_live()
+        with self.lock:
+            if not isinstance(live, dict):
+                for bot in live[1]:
+                    count = bot.get("k")
+                    if not isinstance(count, int):
+                        continue
+                    last, total = self.bots.get(bot.get("n"), (0, 0))
+                    # A count lower than last time is a new server run, counted from zero.
+                    total += count - last if count >= last else count
+                    self.bots[bot.get("n")] = (count, total)
+                if time.time() - self.saved > 60:
+                    write_atomic(KILLS_FILE, json.dumps({"bots": self.bots}, separators=(",", ":")).encode("utf-8"))
+                    self.saved = time.time()
+            return {name: total for name, (_last, total) in self.bots.items()}
+
+
+KILLS = KillTally()
+
+
 def live_status_body():
     """The /api/live answer, as JSON bytes: {"at", "age", "bots"} from the module's snapshot, or
     load_live()'s reason, or {"bots": [], "missing": reason} when the snapshot is stale."""
@@ -683,13 +720,14 @@ class Stats:
             "ON q.guid = c.guid "
             "WHERE a.username LIKE 'RNDBOT%'".format(**DB))
         bots = []
+        counted = KILLS.update()
         for (name, cls, level, xp, online, spec, kills, quests, totaltime, race, money, health,
              zone, cmap, pos_x, pos_y) in rows:
             cls, spec, level, xp = int(cls), int(spec or 0), int(level), int(xp)
             bots.append({
                 "name": name, "cls": self.classes.get(cls, str(cls)), "level": level, "xp": xp,
                 "online": online == "1", "spec": self.specs.get("%d:%d" % (cls, spec), "") if spec else "",
-                "role": role_of(spec), "kills": int(kills), "quests": int(quests), "hours": int(totaltime) / 3600.0,
+                "role": role_of(spec), "kills": max(int(kills), counted.get(name, 0)), "quests": int(quests), "hours": int(totaltime) / 3600.0,
                 "faction": "alliance" if int(race) in ALLIANCE_RACES else "horde",
                 "totalXp": self.xp_levels.get(level, 0) + xp,
                 "gold": int(money) / 10000.0, "dead": int(health) == 0, "zone": int(zone),

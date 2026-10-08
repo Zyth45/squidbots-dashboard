@@ -11,6 +11,7 @@ xp-history.json
 *.log
 *.tmp
 levels.json
+kills.json
 
 # Backups the Settings page takes before it writes a .conf.
 config-backups/
