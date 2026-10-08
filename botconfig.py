@@ -430,28 +430,55 @@ def _log_line_ok(key, value):
     return not value.strip().startswith("0")
 
 
-def log_setup(conf_dir):
-    """{file, present, missing: [keys]} for the journal lines of worldserver.conf."""
-    path = worldserver_conf(conf_dir)
-    if not os.path.exists(path):
-        return {"file": WORLDSERVER, "present": False, "missing": [key for key, _ in LOG_LINES]}
+def worldserver_template(conf_dir):
+    """Settings/worldserver.conf.template of a server that writes worldserver.conf anew at every start
+    (the CoA Server Manager: <root>/Core/configs/modules and <root>/Settings), else None."""
+    root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.normpath(conf_dir))))
+    path = os.path.join(root, "Settings", WORLDSERVER + ".template")
+    return path if os.path.exists(path) else None
+
+
+def _log_values(path):
     found = {}
     for line in open(path, encoding="utf-8", errors="replace"):
         m = re.match(r"^\s*([A-Za-z0-9_.]+)\s*=\s*(.*?)\s*$", line)
         if m:
             found[m.group(1)] = m.group(2).strip('"')
-    return {"file": WORLDSERVER, "present": True,
+    return found
+
+
+def log_setup(conf_dir):
+    """{file, present, missing: [keys]} for the journal lines of worldserver.conf, or of its template
+    when there is one: that is what the next start will use."""
+    path = worldserver_template(conf_dir) or worldserver_conf(conf_dir)
+    if not os.path.exists(path):
+        return {"file": WORLDSERVER, "present": False, "missing": [key for key, _ in LOG_LINES]}
+    found = _log_values(path)
+    return {"file": os.path.basename(path), "present": True,
             "missing": [key for key, _ in LOG_LINES if not _log_line_ok(key, found.get(key))]}
 
 
 def enable_logs(conf_dir, backup_dir):
-    """Write the missing journal lines into worldserver.conf, after a backup. Returns (changed keys, backup)."""
-    path = worldserver_conf(conf_dir)
-    if not os.path.exists(path):
+    """Write the missing journal lines into worldserver.conf, and into its template when the server
+    rebuilds worldserver.conf from one at every start. Returns (changed keys, backed-up file names)."""
+    targets = [path for path in (worldserver_template(conf_dir), worldserver_conf(conf_dir))
+               if path and os.path.exists(path)]
+    if not targets:
         raise FileNotFoundError("%s not found next to %s" % (WORLDSERVER, conf_dir))
-    wanted = [(key, value) for key, value in LOG_LINES if key in log_setup(conf_dir)["missing"]]
+    changed = []
+    for path in targets:
+        for key in _write_log_lines(path, backup_dir):
+            if key not in changed:
+                changed.append(key)
+    return changed, ", ".join(os.path.basename(path) for path in targets) if changed else None
+
+
+def _write_log_lines(path, backup_dir):
+    """Set the journal lines missing from one file, after a backup of it. Returns the keys written."""
+    found = _log_values(path)
+    wanted = [(key, value) for key, value in LOG_LINES if not _log_line_ok(key, found.get(key))]
     if not wanted:
-        return [], None
+        return []
     raw = open(path, "rb").read()
     text = raw.decode("utf-8", errors="replace")
     newline = "\r\n" if "\r\n" in text else "\n"
@@ -467,10 +494,11 @@ def enable_logs(conf_dir, backup_dir):
         lines += ["", "#", "#    Journals read by the SquidBots dashboard (chat, loot, spells, battlegrounds), added by the dashboard.", "#", ""]
         lines += ["%s = %s" % (key, value) for key, value in wanted if key in left] + [""]
     os.makedirs(backup_dir, exist_ok=True)
-    backup = os.path.join(backup_dir, "%s.%s.bak" % (WORLDSERVER, datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S")))
+    backup = os.path.join(backup_dir, "%s.%s.bak" % (os.path.basename(path),
+                                                       datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S")))
     shutil.copy2(path, backup)
     temporary = path + ".tmp"
     with open(temporary, "wb") as handle:
         handle.write(newline.join(lines).encode("utf-8"))
     os.replace(temporary, path)
-    return [key for key, _ in wanted], backup
+    return [key for key, _ in wanted]
