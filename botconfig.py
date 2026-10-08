@@ -148,6 +148,13 @@ SETTINGS = [Setting(*row) for row in (
      "How many bot lines the model writes at the same time. Higher answers faster but loads the machine."),
     ("BotMinds.Limits.MaxCallsPerMinute", BOTMINDS, "Bot chat (LLM)", "Lines per minute, whole realm", "int", None, "restart",
      "A ceiling on model calls per minute across every bot. 0 removes the ceiling."),
+
+    ("AiPlayerbot.RandomBotAutoJoinBGRatedArena2v2Count", PLAYERBOTS, "PvP", "Rated 2v2 arenas the bots keep going", "int", None, "restart",
+     "How many rated 2v2 matches random bots keep running at once. 0 means no bot arenas in 2v2. Bots need level 60 and an arena team."),
+    ("AiPlayerbot.RandomBotAutoJoinBGRatedArena3v3Count", PLAYERBOTS, "PvP", "Rated 3v3 arenas the bots keep going", "int", None, "restart",
+     "How many rated 3v3 matches random bots keep running at once. 0 means no bot arenas in 3v3."),
+    ("AiPlayerbot.RandomBotAutoJoinBGRatedArena5v5Count", PLAYERBOTS, "PvP", "Rated 5v5 arenas the bots keep going", "int", None, "restart",
+     "How many rated 5v5 matches random bots keep running at once. 0 means no bot arenas in 5v5."),
 )]
 
 BY_KEY = {entry.key: entry for entry in SETTINGS}

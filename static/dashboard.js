@@ -5,6 +5,10 @@ const PVP_API = "/api/pvp";
 /* ---------------- words ---------------- */
 const WORDS = {
   en: {
+    arenaBotsTitle: "Bot arenas",
+    arenaBotsHelp: "Random bots play rated arenas on their own when a format is on: they keep one match going in it. Read when the game server starts.",
+    arenaBotsApply: "Apply", arenaBotsMissing: "These settings are not in playerbots.conf.",
+    arenaBotsSaved: "Saved in playerbots.conf (backed up first). Restart the game server for the bots to queue.",
     logsTitle: "Journals are off",
     logsHelp: "This server's worldserver.conf does not write the journals that the chat feed, the most talkative bots, notable finds, spells cast and the battlegrounds on the PvP page read. The dashboard can add the missing lines (the file is backed up first).",
     logsMissing: "Missing or turned off: ", logsApply: "Turn the journals on",
@@ -110,6 +114,10 @@ const WORDS = {
     },
   },
   fr: {
+    arenaBotsTitle: "Arènes des bots",
+    arenaBotsHelp: "Les bots aléatoires jouent des arènes cotées d'eux-mêmes quand un format est activé : ils y gardent un match en cours. Lu au démarrage du serveur de jeu.",
+    arenaBotsApply: "Appliquer", arenaBotsMissing: "Ces réglages ne sont pas dans playerbots.conf.",
+    arenaBotsSaved: "Enregistré dans playerbots.conf (sauvegardé avant). Redémarrez le serveur de jeu pour que les bots s'inscrivent.",
     logsTitle: "Journaux désactivés",
     logsHelp: "Le worldserver.conf de ce serveur n'écrit pas les journaux que lisent le fil de chat, les plus bavards, les trouvailles, les sorts lancés et les champs de bataille de la page JcJ. Le dashboard peut ajouter les lignes manquantes (le fichier est sauvegardé avant).",
     logsMissing: "Absent ou désactivé : ", logsApply: "Activer les journaux",
@@ -286,7 +294,7 @@ function showPage() {
   document.getElementById("pageTitle").textContent = W.pageTitles[PAGE];
   if (PAGE === "pvp") loadPvp();
   /* private:start */if (PAGE === "chat") { loadFeed(); renderBotLang(); renderLogSetup("logSetupChat"); }
-  if (PAGE === "pvp") renderLogSetup("logSetupPvp");/* private:end */
+  if (PAGE === "pvp") { renderLogSetup("logSetupPvp"); renderArenaBots(); }/* private:end */
 }
 window.addEventListener("hashchange", showPage);
 
@@ -802,6 +810,41 @@ function renderPvp() {
 }
 
 /* private:start */
+/* ---------------- bot arenas, on the PvP page ---------------- */
+// One switch per format for AiPlayerbot.RandomBotAutoJoinBGRatedArena<N>Count: on keeps the count the
+// file has (1 when it was 0), off writes 0.
+const ARENA_KEYS = { "2v2": "AiPlayerbot.RandomBotAutoJoinBGRatedArena2v2Count",
+  "3v3": "AiPlayerbot.RandomBotAutoJoinBGRatedArena3v3Count", "5v5": "AiPlayerbot.RandomBotAutoJoinBGRatedArena5v5Count" };
+
+async function renderArenaBots() {
+  const host = document.getElementById("arenaBots");
+  if (!host) return;
+  let config;
+  try { config = await (await fetch("/api/config", { cache: "no-store" })).json(); } catch (error) { return; }
+  const rows = {};
+  for (const s of config.settings || []) rows[s.key] = s;
+  const present = Object.values(ARENA_KEYS).filter(key => rows[key] && rows[key].present !== false);
+  if (!present.length) { host.innerHTML = '<p class="empty">' + esc(W.arenaBotsMissing) + "</p>"; return; }
+  host.innerHTML = '<p class="set-help">' + esc(W.arenaBotsHelp) + '</p><div class="search-row">'
+    + Object.entries(ARENA_KEYS).map(([name, key]) => '<label class="toggle"><input type="checkbox" data-key="' + esc(key) + '"'
+      + (Number((rows[key] || {}).value) > 0 ? " checked" : "") + "> " + esc(name) + "</label>").join(" ")
+    + '<button class="btn primary" type="button" id="arenaBotsApply">' + esc(W.arenaBotsApply) + '</button></div><p class="meta" id="arenaBotsNote"></p>';
+  document.getElementById("arenaBotsApply").addEventListener("click", async () => {
+    const changes = {};
+    for (const box of host.querySelectorAll("input[data-key]")) {
+      const current = Number((rows[box.dataset.key] || {}).value) || 0;
+      changes[box.dataset.key] = box.checked ? String(Math.max(1, current)) : "0";
+    }
+    const note = document.getElementById("arenaBotsNote");
+    let answer;
+    try {
+      answer = await (await fetch("/api/config", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(changes) })).json();
+    } catch (error) { answer = { error: String(error) }; }
+    note.textContent = answer.error || (answer.errors && Object.values(answer.errors).join(" ")) || W.arenaBotsSaved;
+  });
+}
+
 /* ---------------- the journals of worldserver.conf ---------------- */
 // Chat.log, BotLoot.log, CoaBots.log and the battleground tables are written only when worldserver.conf
 // asks for them; a server set up without those lines leaves several cards empty for good.
