@@ -116,20 +116,26 @@ Appender.BotLoot = 2,4,1,BotLoot.log,a
 Logger.playerbots.loot = 4,BotLoot
 ```
 
-Chat feed and most talkative (stock AzerothCore):
+Chat feed and most talkative: the bots' own lines (the module writes them, since a bot sends no chat
+packet), and the players' chat if you want it too (stock AzerothCore):
 
 ```ini
-ChatLog.Enable = 1
 Appender.Chat = 2,4,1,Chat.log,a
+Logger.playerbots.chat = 4,Chat
+# optional, the players' chat:
+ChatLog.Enable = 1
 Logger.chat.say = 4,Chat
 Logger.chat.yell = 4,Chat
-Logger.chat.emote = 4,Chat
 Logger.chat.channel = 4,Chat
 Logger.chat.whisper = 4,Chat
 Logger.chat.party = 4,Chat
-Logger.chat.raid = 4,Chat
 Logger.chat.guild = 4,Chat
 ```
+
+The PvP page's battlegrounds need `Battleground.StoreStatistics.Enable = 1`.
+
+The Chat & Loot and PvP pages offer a **Turn the journals on** button when these lines are missing:
+it sets the required ones in place, after a backup of `worldserver.conf`.
 
 ## The Settings page
 

@@ -403,16 +403,10 @@ def apply_settings(conf_dir, changes, backup_dir):
 # without these lines in worldserver.conf writes none of them, so those cards stay empty.
 # AzerothCore refuses a key written twice, so a line already there is changed in place, never repeated.
 LOG_LINES = [
-    ("ChatLog.Enable", "1"),
+    # What the bots say: the module writes it on its own logger (a bot sends no chat packet, so the
+    # core's chat log never sees it). The players' own chat (ChatLog.Enable, Logger.chat.*) is optional.
     ("Appender.Chat", "2,4,1,Chat.log,a"),
-    ("Logger.chat.say", "4,Chat"),
-    ("Logger.chat.yell", "4,Chat"),
-    ("Logger.chat.emote", "4,Chat"),
-    ("Logger.chat.channel", "4,Chat"),
-    ("Logger.chat.whisper", "4,Chat"),
-    ("Logger.chat.party", "4,Chat"),
-    ("Logger.chat.raid", "4,Chat"),
-    ("Logger.chat.guild", "4,Chat"),
+    ("Logger.playerbots.chat", "4,Chat"),
     ("Appender.BotLoot", "2,4,1,BotLoot.log,a"),
     ("Logger.playerbots.loot", "4,BotLoot"),
     ("Appender.CoaBots", "2,4,1,CoaBots.log,a"),
@@ -430,7 +424,7 @@ def worldserver_conf(conf_dir):
 def _log_line_ok(key, value):
     if value is None:
         return False
-    if key in ("ChatLog.Enable", "Battleground.StoreStatistics.Enable"):
+    if key == "Battleground.StoreStatistics.Enable":
         return value.strip() == "1"
     # Appender "type,level,..." and Logger "level,appenders": level 0 turns them off.
     return not value.strip().startswith("0")
