@@ -26,7 +26,7 @@ const WORDS = {
     pvpGames: "Games", pvpFights: "Fights", pvpAllianceWins: "Alliance wins", pvpHordeWins: "Horde wins",
     pvpPerGame: "players per game", pvpKills: "Killing blows", pvpAvg: "Average", pvpMedian: "Median",
     pvpTeams: "Active teams", pvpRating: "Rating", pvpWins: "Wins", pvpClasses: "Classes", pvpTeam: "Team",
-    pvpObjectivesHead: "Objectives (Alliance / Horde)",
+    pvpObjectivesHead: "Objectives",
     pvpPlayersTeam: "Players' team", pvpTeamNo: "Team no. ", pvpNone: "Nothing played in this window.",
     pvpCharacters: "Characters", pvpBots: "bots", pvpPlayers: "players",
     pvpBgPlayed: "BG played", pvpArenaPlayed: "Arenas played", pvpWinRate: "Win rate", pvpOthers: "Everyone else",
@@ -135,7 +135,7 @@ const WORDS = {
     pvpGames: "Parties", pvpFights: "Combats", pvpAllianceWins: "Victoires Alliance", pvpHordeWins: "Victoires Horde",
     pvpPerGame: "joueurs par partie", pvpKills: "Coups fatals", pvpAvg: "Moyenne", pvpMedian: "Médiane",
     pvpTeams: "Équipes actives", pvpRating: "Cote", pvpWins: "Victoires", pvpClasses: "Classes", pvpTeam: "Équipe",
-    pvpObjectivesHead: "Objectifs (Alliance / Horde)",
+    pvpObjectivesHead: "Objectifs",
     pvpPlayersTeam: "Équipe de joueurs", pvpTeamNo: "Équipe n° ", pvpNone: "Rien de joué sur cette période.",
     pvpCharacters: "Personnages", pvpBots: "bots", pvpPlayers: "joueurs",
     pvpBgPlayed: "BG joués", pvpArenaPlayed: "Arènes jouées", pvpWinRate: "Taux de victoire", pvpOthers: "Tous les autres",
@@ -747,16 +747,19 @@ function renderPvp() {
 
   const sides = (a, h) => '<div class="split" style="height:8px"><i style="width:' + (a + h ? a / (a + h) * 100 : 50)
     + '%;background:var(--alliance)"></i><i style="flex:1;background:var(--horde)"></i></div>';
+  // Alliance in blue, Horde in red, the colours of the bars: a pair reads without its header.
+  const vs = (a, h) => '<span class="num" style="color:var(--alliance)">' + n(a) + '</span> · <span class="num" style="color:var(--horde)">'
+    + n(h) + "</span>";
   const bgRows = ["warsong", "arathi", "alterac"].map(key => {
     const b = bg[key] || {}, v = b.victoires || {}, k = b.coups_fatals || {};
-    const objectives = (b.objectifs || []).map(o => esc(W.pvpObjectives[o.cle] || o.cle) + ' <span class="num">'
-      + n(o.alliance) + " / " + n(o.horde) + "</span>").join("<br>");
+    const objectives = (b.objectifs || []).map(o => esc(W.pvpObjectives[o.cle] || o.cle) + " "
+      + vs(o.alliance, o.horde)).join("<br>");
     return "<tr><td>" + esc(W.pvpTypes[key]) + '</td><td class="r">' + n(b.parties) + "</td><td>"
-      + (b.parties ? sides(v.alliance || 0, v.horde || 0) + '<span class="meta num">' + n(v.alliance) + " / " + n(v.horde) + "</span>" : "–")
-      + '</td><td class="r">' + n(k.alliance) + " / " + n(k.horde) + '</td><td class="meta">' + (objectives || "–") + "</td></tr>";
+      + (b.parties ? sides(v.alliance || 0, v.horde || 0) + '<span class="meta">' + vs(v.alliance, v.horde) + "</span>" : "–")
+      + '</td><td class="r">' + vs(k.alliance, k.horde) + '</td><td class="meta">' + (objectives || "–") + "</td></tr>";
   }).join("");
   const bgCard = '<section class="card"><h2>' + esc(W.pvpBgTitle) + sub(W.pvpBgSub) + "</h2>"
-    + table([null, H(W.pvpGames, 1), H("Alliance / Horde"), H(W.pvpKills, 1), H(W.pvpObjectivesHead)], bgRows) + "</section>";
+    + table([null, H(W.pvpGames, 1), H("Alliance · Horde"), H(W.pvpKills, 1), H(W.pvpObjectivesHead)], bgRows) + "</section>";
 
   const arRows = ["2v2", "3v3", "5v5"].map(key => {
     const a = ar[key] || {};
