@@ -493,3 +493,11 @@ footer { color: var(--text-muted); font-size: 12px; text-align: center; padding:
 /* ---------- PvP ---------- */
 #pvp td.r { white-space: nowrap; }
 #pvp .tabs { margin-top: 0; }
+.arena-switches { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 12px; }
+.arena-switch { display: inline-flex; align-items: center; gap: 8px; padding: 7px 14px; cursor: pointer; user-select: none;
+  font-family: var(--display); font-weight: 600; font-size: 13px; letter-spacing: .04em; color: var(--text-muted);
+  background: #0b0806; border: 1px solid var(--border); border-radius: 3px; transition: color .15s, border-color .15s; }
+.arena-switch:hover { color: var(--text-primary); }
+.arena-switch:has(input:checked) { color: var(--gold-bright); border-color: var(--gold); background: rgba(214, 176, 98, .08); }
+.arena-switch input { accent-color: var(--gold); margin: 0; }
+.arena-switches .btn { margin-left: 8px; }

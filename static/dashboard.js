@@ -828,9 +828,9 @@ async function renderArenaBots() {
   for (const s of config.settings || []) rows[s.key] = s;
   const present = Object.values(ARENA_KEYS).filter(key => rows[key] && rows[key].present !== false);
   if (!present.length) { host.innerHTML = '<p class="empty">' + esc(W.arenaBotsMissing) + "</p>"; return; }
-  host.innerHTML = '<p class="set-help">' + esc(W.arenaBotsHelp) + '</p><div class="search-row">'
-    + Object.entries(ARENA_KEYS).map(([name, key]) => '<label class="toggle"><input type="checkbox" data-key="' + esc(key) + '"'
-      + (Number((rows[key] || {}).value) > 0 ? " checked" : "") + "> " + esc(name) + "</label>").join(" ")
+  host.innerHTML = '<p class="set-help">' + esc(W.arenaBotsHelp) + '</p><div class="arena-switches">'
+    + Object.entries(ARENA_KEYS).map(([name, key]) => '<label class="arena-switch"><input type="checkbox" data-key="' + esc(key) + '"'
+      + (Number((rows[key] || {}).value) > 0 ? " checked" : "") + "><span>" + esc(name) + "</span></label>").join("")
     + '<button class="btn primary" type="button" id="arenaBotsApply">' + esc(W.arenaBotsApply) + '</button></div><p class="meta" id="arenaBotsNote"></p>';
   document.getElementById("arenaBotsApply").addEventListener("click", async () => {
     const changes = {};
