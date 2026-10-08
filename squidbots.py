@@ -1252,6 +1252,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self._json(STATS.get())
         elif path == "/api/config":
             self._json(config_payload())
+        elif path == "/api/logs":
+            self._json(dict(botconfig.log_setup(CONFIG_DIR), serverRunning=server_state().get("running", False)))
         elif path == "/api/pvp":
             self._send(PVP.get(), "application/json; charset=utf-8")
         elif path == "/api/art":
@@ -1332,6 +1334,18 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 self._json({"error": problem}, 400)
                 return
             self._json(art_status())
+            return
+        if path == "/api/logs":
+            if not self._local_only():
+                return
+            try:
+                changed, backup = botconfig.enable_logs(CONFIG_DIR, CONFIG_BACKUPS)
+            except Exception as error:           # noqa: BLE001
+                self._json({"error": "%s: %s" % (type(error).__name__, error)}, 500)
+                return
+            self._json(dict(botconfig.log_setup(CONFIG_DIR), changed=changed,
+                            backup=os.path.basename(backup) if backup else None,
+                            serverRunning=server_state().get("running", False)))
             return
         if path != "/api/config":
             self.send_error(404)

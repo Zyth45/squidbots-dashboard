@@ -5,6 +5,11 @@ const PVP_API = "/api/pvp";
 /* ---------------- words ---------------- */
 const WORDS = {
   en: {
+    logsTitle: "Journals are off",
+    logsHelp: "This server's worldserver.conf does not write the journals that the chat feed, the most talkative bots, notable finds, spells cast and the battlegrounds on the PvP page read. The dashboard can add the missing lines (the file is backed up first).",
+    logsMissing: "Missing or turned off: ", logsApply: "Turn the journals on",
+    logsDone: "Done: worldserver.conf now writes the journals. Restart the game server; the cards fill as the bots play.",
+    logsNoFile: "worldserver.conf was not found next to the module configs.",
     navPvp: "PvP",
     pvpLoading: "Reading the battlegrounds and arenas…",
     pvpError: "The PvP figures could not be read: ",
@@ -69,7 +74,7 @@ const WORDS = {
     xpTitle: "Best experience gains", xpSpan: h => "over the last " + h + " hours", xpMeasuring: "measuring",
     xpWait: "First reading under way: the ranking starts after an hour of play.",
     xpUnit: "xp/h", levelShort: n => "level " + n,
-    chatTitle: "Most talkative", chatNone: "The chat journal starts at the next server restart.",
+    chatTitle: "Most talkative", chatNone: "No chat journal yet.",
     chatSub: (m, t) => m + " messages · " + t + " talkers",
     chatChannel: n => n + " in a channel", chatOther: "conversations and emotes", chatUnit: "msg",
     feedTitle: "Live chat", feedSub: n => n + " lines, newest first, refreshed every 5 s",
@@ -90,7 +95,7 @@ const WORDS = {
     spellsNone: "No spell journal.",
     colAction: "Action", colSuccess: "Success", colCast: "Cast", colTried: "Tried",
     lootTitle: "Notable finds", lootSub: n => n + " in the last two days",
-    lootNone: "No loot journal yet: it starts at the next server restart.",
+    lootNone: "No loot journal yet.",
     lootQuiet: "Nothing notable in the last two days.",
     sheetLevel: "Level", sheetKills: "Mobs killed", sheetQuests: "Quests", sheetPlayed: "Time played",
     sheetXp: "Experience", sheetZone: "Zone", close: "Close",
@@ -105,6 +110,11 @@ const WORDS = {
     },
   },
   fr: {
+    logsTitle: "Journaux désactivés",
+    logsHelp: "Le worldserver.conf de ce serveur n'écrit pas les journaux que lisent le fil de chat, les plus bavards, les trouvailles, les sorts lancés et les champs de bataille de la page JcJ. Le dashboard peut ajouter les lignes manquantes (le fichier est sauvegardé avant).",
+    logsMissing: "Absent ou désactivé : ", logsApply: "Activer les journaux",
+    logsDone: "C'est fait : worldserver.conf écrit maintenant les journaux. Redémarrez le serveur de jeu ; les cartes se rempliront à mesure que les bots jouent.",
+    logsNoFile: "worldserver.conf est introuvable à côté des configs des modules.",
     navPvp: "JcJ",
     pvpLoading: "Lecture des champs de bataille et des arènes…",
     pvpError: "Les chiffres JcJ n'ont pas pu être lus : ",
@@ -171,7 +181,7 @@ const WORDS = {
     xpMeasuring: "mesure en cours",
     xpWait: "Première mesure en cours : le classement démarre après une heure de jeu.",
     xpUnit: "xp/h", levelShort: n => "niveau " + n,
-    chatTitle: "Les plus bavards", chatNone: "Le journal du chat commence au prochain démarrage du serveur.",
+    chatTitle: "Les plus bavards", chatNone: "Pas encore de journal du chat.",
     chatSub: (m, t) => m + " messages · " + t + " bavards",
     chatChannel: n => n + " dans un canal", chatOther: "conversations et émotes", chatUnit: "msg",
     feedTitle: "Chat en direct", feedSub: n => n + " lignes, les plus récentes en haut, mises à jour toutes les 5 s",
@@ -192,7 +202,7 @@ const WORDS = {
     spellsNone: "Pas de journal des sorts.",
     colAction: "Action", colSuccess: "Réussite", colCast: "Lancés", colTried: "Tentés",
     lootTitle: "Butin remarquable", lootSub: n => n + " sur les deux derniers jours",
-    lootNone: "Pas encore de journal du butin : il commence au prochain démarrage du serveur.",
+    lootNone: "Pas encore de journal du butin.",
     lootQuiet: "Rien de remarquable sur les deux derniers jours.",
     sheetLevel: "Niveau", sheetKills: "Monstres tués", sheetQuests: "Quêtes", sheetPlayed: "Temps de jeu",
     sheetXp: "Expérience", sheetZone: "Zone", close: "Fermer",
@@ -275,7 +285,8 @@ function showPage() {
   }
   document.getElementById("pageTitle").textContent = W.pageTitles[PAGE];
   if (PAGE === "pvp") loadPvp();
-  /* private:start */if (PAGE === "chat") { loadFeed(); renderBotLang(); }/* private:end */
+  /* private:start */if (PAGE === "chat") { loadFeed(); renderBotLang(); renderLogSetup("logSetupChat"); }
+  if (PAGE === "pvp") renderLogSetup("logSetupPvp");/* private:end */
 }
 window.addEventListener("hashchange", showPage);
 
@@ -791,6 +802,31 @@ function renderPvp() {
 }
 
 /* private:start */
+/* ---------------- the journals of worldserver.conf ---------------- */
+// Chat.log, BotLoot.log, CoaBots.log and the battleground tables are written only when worldserver.conf
+// asks for them; a server set up without those lines leaves several cards empty for good.
+async function renderLogSetup(hostId) {
+  const host = document.getElementById(hostId);
+  if (!host) return;
+  let state;
+  try { state = await (await fetch("/api/logs", { cache: "no-store" })).json(); } catch (error) { return; }
+  const card = host.closest(".card");
+  if (!state.missing || !state.missing.length) { card.hidden = true; return; }
+  card.hidden = false;
+  if (!state.present) { host.innerHTML = '<p class="empty">' + esc(W.logsNoFile) + "</p>"; return; }
+  host.innerHTML = '<p class="set-help">' + esc(W.logsHelp) + '</p><p class="meta">' + esc(W.logsMissing + state.missing.join(", "))
+    + '</p><button class="btn primary" type="button">' + esc(W.logsApply) + '</button><p class="meta"></p>';
+  host.querySelector("button").addEventListener("click", async () => {
+    const note = host.querySelector("p.meta:last-child");
+    let answer;
+    try {
+      answer = await (await fetch("/api/logs", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" })).json();
+    } catch (error) { answer = { error: String(error) }; }
+    if (answer.error) { note.textContent = answer.error; return; }
+    host.innerHTML = '<p class="set-help">' + esc(W.logsDone) + "</p>";
+  });
+}
+
 /* ---------------- the bots' chat language ---------------- */
 // AiPlayerbot.BotTextLocale in playerbots.conf: the language of every line the bots say on their own
 // (channels, say, whispers), from the translations in ai_playerbot_texts. No AI involved.

@@ -396,3 +396,87 @@ def apply_settings(conf_dir, changes, backup_dir):
         written[filename] = len(pairs)
 
     return written, backups, errors
+
+
+# The journals some cards read (chat feed, most talkative, notable finds, spells cast, and the
+# battleground tables of the PvP page). A server
+# without these lines in worldserver.conf writes none of them, so those cards stay empty.
+# AzerothCore refuses a key written twice, so a line already there is changed in place, never repeated.
+LOG_LINES = [
+    ("ChatLog.Enable", "1"),
+    ("Appender.Chat", "2,4,1,Chat.log,a"),
+    ("Logger.chat.say", "4,Chat"),
+    ("Logger.chat.yell", "4,Chat"),
+    ("Logger.chat.emote", "4,Chat"),
+    ("Logger.chat.channel", "4,Chat"),
+    ("Logger.chat.whisper", "4,Chat"),
+    ("Logger.chat.party", "4,Chat"),
+    ("Logger.chat.raid", "4,Chat"),
+    ("Logger.chat.guild", "4,Chat"),
+    ("Appender.BotLoot", "2,4,1,BotLoot.log,a"),
+    ("Logger.playerbots.loot", "4,BotLoot"),
+    ("Appender.CoaBots", "2,4,1,CoaBots.log,a"),
+    ("Logger.playerbots.coa", "4,CoaBots"),
+    ("Battleground.StoreStatistics.Enable", "1"),
+]
+WORLDSERVER = "worldserver.conf"
+
+
+def worldserver_conf(conf_dir):
+    """worldserver.conf sits one folder above the module configs."""
+    return os.path.join(os.path.dirname(os.path.normpath(conf_dir)), WORLDSERVER)
+
+
+def _log_line_ok(key, value):
+    if value is None:
+        return False
+    if key in ("ChatLog.Enable", "Battleground.StoreStatistics.Enable"):
+        return value.strip() == "1"
+    # Appender "type,level,..." and Logger "level,appenders": level 0 turns them off.
+    return not value.strip().startswith("0")
+
+
+def log_setup(conf_dir):
+    """{file, present, missing: [keys]} for the journal lines of worldserver.conf."""
+    path = worldserver_conf(conf_dir)
+    if not os.path.exists(path):
+        return {"file": WORLDSERVER, "present": False, "missing": [key for key, _ in LOG_LINES]}
+    found = {}
+    for line in open(path, encoding="utf-8", errors="replace"):
+        m = re.match(r"^\s*([A-Za-z0-9_.]+)\s*=\s*(.*?)\s*$", line)
+        if m:
+            found[m.group(1)] = m.group(2).strip('"')
+    return {"file": WORLDSERVER, "present": True,
+            "missing": [key for key, _ in LOG_LINES if not _log_line_ok(key, found.get(key))]}
+
+
+def enable_logs(conf_dir, backup_dir):
+    """Write the missing journal lines into worldserver.conf, after a backup. Returns (changed keys, backup)."""
+    path = worldserver_conf(conf_dir)
+    if not os.path.exists(path):
+        raise FileNotFoundError("%s not found next to %s" % (WORLDSERVER, conf_dir))
+    wanted = [(key, value) for key, value in LOG_LINES if key in log_setup(conf_dir)["missing"]]
+    if not wanted:
+        return [], None
+    raw = open(path, "rb").read()
+    text = raw.decode("utf-8", errors="replace")
+    newline = "\r\n" if "\r\n" in text else "\n"
+    lines = text.split(newline)
+    left = dict(wanted)
+    for i, line in enumerate(lines):
+        m = re.match(r"^(\s*)([A-Za-z0-9_.]+)(\s*=\s*)", line)
+        if m and m.group(2) in left:
+            lines[i] = "%s = %s" % (m.group(2), left.pop(m.group(2)))
+    if left:
+        while lines and lines[-1] == "":
+            lines.pop()
+        lines += ["", "#", "#    Journals read by the SquidBots dashboard (chat, loot, spells, battlegrounds), added by the dashboard.", "#", ""]
+        lines += ["%s = %s" % (key, value) for key, value in wanted if key in left] + [""]
+    os.makedirs(backup_dir, exist_ok=True)
+    backup = os.path.join(backup_dir, "%s.%s.bak" % (WORLDSERVER, datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S")))
+    shutil.copy2(path, backup)
+    temporary = path + ".tmp"
+    with open(temporary, "wb") as handle:
+        handle.write(newline.join(lines).encode("utf-8"))
+    os.replace(temporary, path)
+    return [key for key, _ in wanted], backup
