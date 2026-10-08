@@ -87,6 +87,22 @@ process anyone can reach. It is built, not filtered:
 - The page's private code sits between `private:start` and `private:end` markers and is removed
   from the public files, not hidden. Publishing stops if anything private is left in them.
 
+### On another PC of your network
+
+The dashboard listens on this machine only (`http://localhost:8088`). To open it from another PC of
+your home network, add a second port to `dashboard.json`:
+
+```json
+"lanPort": 8089
+```
+
+Then open `http://<the server PC's address>:8089` on the other PC (for example
+`http://192.168.1.20:8089`). This port serves the **public version**, read-only: the map, bots,
+stats, chat counts, loot and PvP pages, without the Settings page, the real players' chat and
+whispers, paths or crash details. Settings are still changed on the server PC itself, at
+`localhost:8088`. Windows Firewall asks once whether Python may accept connections: allow it for
+private networks only. `"lanListen": "192.168.1.20"` limits the port to one network card.
+
 ## Logs some cards need
 
 Add these to `worldserver.conf` and restart; until then the cards stay empty and say so.

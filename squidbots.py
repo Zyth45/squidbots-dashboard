@@ -102,6 +102,10 @@ XP_KEEP = 25 * 3600
 # Optional public copy: a folder a web server serves, on a NAS or anywhere else. The dashboard only
 # writes files there, so nothing on this machine is reachable from outside. Unset: no copy.
 PUBLISH_DIR = SETTINGS.get("publishDir")
+# Optional: the public page on the local network too ("lanPort": 8089), for another PC of the house.
+# It is the public copy, read-only: no settings, no real players' chat, no paths.
+LAN_PORT = int(SETTINGS.get("lanPort") or 0)
+LAN_LISTEN = SETTINGS.get("lanListen") or "0.0.0.0"     # every network card; or one address of this PC
 PUBLISH_EVERY = 60
 # Usage report of the CoA bot actions, written by the worldserver every 10 minutes (counts since its start).
 COA_LOG = SETTINGS.get("coaLog") or os.path.join(ROOT, "Core", "Logs", "CoaBots.log")
@@ -488,20 +492,23 @@ def public_live(bots, players):
     return out
 
 
+def public_live_body():
+    live = load_live()
+    if isinstance(live, dict):
+        body = {"at": 0, "bots": [], "absent": True} if live.get("absent") else {"at": 0, "bots": []}
+    else:
+        at, bots, _encoded = live
+        age = max(0, round(time.time() - float(at)))
+        body = {"at": int(at), "age": age,
+                "bots": [] if age > STATUS_STALE else public_live(bots, real_player_names())}
+    return json.dumps(body, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+
+
 def live_publish_loop():
     last_error = None
     while True:
         try:
-            live = load_live()
-            if isinstance(live, dict):
-                body = {"at": 0, "bots": [], "absent": True} if live.get("absent") else {"at": 0, "bots": []}
-            else:
-                at, bots, _encoded = live
-                age = max(0, round(time.time() - float(at)))
-                body = {"at": int(at), "age": age,
-                        "bots": [] if age > STATUS_STALE else public_live(bots, real_player_names())}
-            write_atomic(os.path.join(PUBLISH_DIR, "live.json"),
-                         json.dumps(body, ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
+            write_atomic(os.path.join(PUBLISH_DIR, "live.json"), public_live_body())
             last_error = None
         except Exception as error:  # the NAS may be asleep: said once, tried again
             if str(error) != last_error:
@@ -1361,6 +1368,57 @@ class Handler(http.server.BaseHTTPRequestHandler):
         pass
 
 
+_LAN_FILES = {"key": None, "files": {}}
+
+
+def lan_files():
+    """public_files(), built again only when one of its sources changes."""
+    sources = [os.path.join(HERE, *name) for name in (("index.html",), ("static", "dashboard.js"),
+                                                     ("static", "dashboard.css"), ("worldmap.json",))]
+    key = tuple(os.path.getmtime(path) if os.path.exists(path) else 0 for path in sources)
+    if key != _LAN_FILES["key"]:
+        _LAN_FILES.update(key=key, files=public_files())
+    return _LAN_FILES["files"]
+
+
+class LanHandler(Handler):
+    """The public page for the other machines of the local network: the same files and the same
+    filtered stats as the public copy (publishDir), and nothing else. Nothing can be written here."""
+    def do_GET(self):
+        path = urllib.parse.urlsplit(self.path).path
+        leaf = path.lstrip("/") or "index.html"
+        try:
+            if leaf == "stats.json":
+                self._send(json.dumps(public_copy(STATS.get()), ensure_ascii=False, separators=(",", ":"))
+                           .encode("utf-8"), "application/json; charset=utf-8")
+            elif leaf == "live.json":
+                self._send(public_live_body(), "application/json; charset=utf-8")
+            elif leaf == "pvp.json":
+                body = PVP.get()
+                # The error text may hold paths: visitors only learn that the figures are missing.
+                self._send(b'{"error":"unavailable"}' if b'"error"' in body[:20] else body,
+                           "application/json; charset=utf-8")
+            elif leaf.startswith("maps/"):
+                name = leaf[len("maps/"):]
+                target = os.path.join(HERE, "maps", *name.split("/"))
+                if MAP_FILE.match(name) and name in map_files() and os.path.exists(target):
+                    self._send(open(target, "rb").read(), "image/png")
+                else:
+                    self.send_error(404)
+            elif leaf in lan_files():
+                kind = {".html": "text/html; charset=utf-8", ".json": "application/json; charset=utf-8"}
+                self._send(lan_files()[leaf], kind.get(os.path.splitext(leaf)[1])
+                           or STATIC_TYPES.get(os.path.splitext(leaf)[1], "application/octet-stream"))
+            else:
+                self.send_error(404)
+        except Exception as error:               # noqa: BLE001
+            print("Local network page failed:", error, flush=True)
+            self.send_error(500)
+
+    def do_POST(self):
+        self.send_error(405)
+
+
 if __name__ == "__main__":
     server = http.server.ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
     print("SquidBots dashboard: http://localhost:%d  (Ctrl+C to stop)" % PORT, flush=True)
@@ -1369,4 +1427,11 @@ if __name__ == "__main__":
         threading.Thread(target=live_publish_loop, daemon=True).start()
         print("Public copy refreshed every minute in %s (live view every %d s)" % (PUBLISH_DIR, LIVE_PUBLISH_EVERY),
               flush=True)
+    if LAN_PORT:
+        try:
+            lan = http.server.ThreadingHTTPServer((LAN_LISTEN, LAN_PORT), LanHandler)
+            threading.Thread(target=lan.serve_forever, daemon=True).start()
+            print("Public page on the local network: http://<this PC's address>:%d (read-only)" % LAN_PORT, flush=True)
+        except OSError as error:                 # port taken or refused: the dashboard itself still runs
+            print("Local network page not started on %s:%d: %s" % (LAN_LISTEN, LAN_PORT, error), flush=True)
     server.serve_forever()

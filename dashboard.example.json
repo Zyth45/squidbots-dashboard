@@ -31,6 +31,9 @@
   "pvpSince": "2026-10-07 20:00:00",
   "pvpSinceTitle": "Since 1.9|Depuis la 1.9",
 
+  "_comment_lan": "Optional: the public, read-only page on a second port for the other PCs of your network (http://<this PC's address>:8089). lanListen limits it to one address of this PC; without it, every network card.",
+  "lanPort": 8089,
+
   "_comment_footer": "Replaces the line at the foot of the page. An empty string removes it entirely, links included, which is what you want while sharing the page before the sources are ready.",
   "footer": "",
 
