@@ -277,6 +277,8 @@ function closeArmoryPopup() {
   const dialog = document.getElementById("armoryPopup");
   if (dialog && dialog.open) dialog.close();
 }
+// Another page (a link, the menu, Back) closes the window: it belongs to the Bots page.
+window.addEventListener("hashchange", closeArmoryPopup);
 
 // The item's tooltip, laid out like the game's: name in its quality's colour, then what it gives.
 function itemTipHtml(piece, slotWord) {
