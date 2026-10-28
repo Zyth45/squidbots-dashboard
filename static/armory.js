@@ -9,6 +9,7 @@
 
 const ARMORY_WORDS = {
   en: {
+    fullPage: "Full page",
     hint: "Type the start of a character name (two letters at least).", none: "No character by that name.",
     bot: "bot", hoursPlayed: h => h + " h played", seeOnMap: "See on the map", guildNone: "no guild",
     loading: "Loading…", failed: "The dashboard did not answer.", level: "Level",
@@ -43,6 +44,7 @@ const ARMORY_WORDS = {
             "Trinket", "Trinket", "Back", "Main hand", "Off hand", "Ranged", "Tabard"],
   },
   fr: {
+    fullPage: "Page complète",
     hint: "Tapez le début d'un nom de personnage (deux lettres au moins).", none: "Aucun personnage de ce nom.",
     bot: "bot", hoursPlayed: h => h + " h jouées", seeOnMap: "Voir sur la carte", guildNone: "sans guilde",
     loading: "Chargement…", failed: "Le dashboard n'a pas répondu.", level: "Niveau",
@@ -145,18 +147,19 @@ function sheetDate(ts) {
   return new Date(ts * 1000).toLocaleString(lang === "fr" ? "fr-FR" : "en-GB", { dateStyle: "medium", timeStyle: "short" });
 }
 
-async function renderCharacter(name) {
-  const host = armoryHost();
+// `popup`: the sheet goes in the window opened from the Bots page (openArmoryPopup) instead of the Armory page.
+async function renderCharacter(name, popup) {
+  const host = popup || armoryHost();
   const words = AW();
-  if (!SHEET || SHEET.name !== name) host.innerHTML = '<p class="empty">' + esc(words.loading) + "</p>";
+  if (popup || !SHEET || SHEET.name !== name) host.innerHTML = '<p class="empty">' + esc(words.loading) + "</p>";
   const data = await armoryApi("/character?name=" + encodeURIComponent(name));
-  if (PAGE !== "armory" || armoryName() !== name) return;     // gone elsewhere meanwhile
+  if (popup ? popup.dataset.sheet !== name : PAGE !== "armory" || armoryName() !== name) return;   // gone elsewhere meanwhile
+  const back = popup ? "" : '<p class="back-link"><a href="#armory">' + esc(words.backToSearch) + "</a></p>";
   if (data.error) {
-    host.innerHTML = '<p class="back-link"><a href="#armory">' + esc(words.backToSearch) + '</a></p><p class="empty bad-text">'
-      + esc(data.error) + "</p>";
+    host.innerHTML = back + '<p class="empty bad-text">' + esc(data.error) + "</p>";
     return;
   }
-  SHEET = data;
+  if (!popup) SHEET = data;
   const bySlot = {};
   for (const piece of data.gear) bySlot[piece.slot] = piece;
   const tile = (slot, side) => {
@@ -190,15 +193,17 @@ async function renderCharacter(name) {
   const notes = (data.names ? "" : '<p class="armory-note">' + esc(words.noNames) + "</p>")
     + (noIconSource(data.icons) ? '<p class="armory-note">' + esc(words.noIcons) + "</p>" : "");
 
-  host.innerHTML = '<p class="back-link"><a href="#armory">' + esc(words.backToSearch) + "</a></p>" + notes
+  host.innerHTML = back + notes
     + '<div class="sheet-head"><span class="sheet-crest">' + esc(data.name.slice(0, 1)) + '</span><div class="sheet-who">'
       + '<h2 class="sheet-name">' + esc(data.name) + (data.bot ? ' <span class="badge">' + esc(words.bot) + "</span>" : "") + "</h2>"
       + '<div class="meta">' + factionDot(data.faction) + esc(words.level) + " " + data.level + " · " + characterLine(data)
       + (data.guild ? " · &lt;" + esc(data.guild) + "&gt;" : "") + " · " + esc(words.hoursPlayed(num(data.hours)))
       + (data.bot && data.zone ? " · " + esc(data.zone) : "") + "</div></div>"
       + '<div class="sheet-ilvl"><b>' + data.itemLevel + "</b><span>" + esc(words.avgItemLevel) + "</span></div>"
-      + '<button class="btn small" type="button" id="copySheetLink">' + esc(words.copyLink) + "</button>"
-      + (data.bot && data.online ? '<button class="btn small" type="button" id="seeSheetBot">' + esc(words.seeOnMap) + "</button>" : "")
+      + (popup ? '<a class="btn small" href="#armory/' + esc(encodeURIComponent(data.name)) + '" data-sheet-page>'
+        + esc(words.fullPage) + "</a>"
+        : '<button class="btn small" type="button" data-sheet-copy>' + esc(words.copyLink) + "</button>")
+      + (data.bot && data.online ? '<button class="btn small" type="button" data-sheet-see>' + esc(words.seeOnMap) + "</button>" : "")
     + "</div>"
     + '<section class="card doll"><div class="doll-side">' + DOLL_LEFT.map(s => tile(s, "left")).join("") + "</div>"
       + '<div class="doll-middle"><h3>' + esc(words.statsTitle) + "</h3>" + stats + '<p class="meta">'
@@ -209,14 +214,17 @@ async function renderCharacter(name) {
       + '<section class="card"><h2>' + esc(words.achievements) + ' <span class="sub">' + esc(words.earned(num(earned.count)))
       + (earned.points === null ? "" : " · " + esc(words.points(num(earned.points)))) + "</span></h2>" + achievements
       + "</section></div>"
-    + armoryHow("sheet") + '<div class="item-tip" id="itemTip" hidden></div>';
+    + (popup ? "" : armoryHow("sheet")) + '<div class="item-tip" hidden></div>';
 
-  document.getElementById("copySheetLink").addEventListener("click", event => {
+  const copy = host.querySelector("[data-sheet-copy]");
+  if (copy) copy.addEventListener("click", event => {
     const link = location.origin + location.pathname + "#armory/" + encodeURIComponent(data.name);
     if (navigator.clipboard) navigator.clipboard.writeText(link).then(() => { event.target.textContent = words.linkCopied; }, () => {});
   });
-  const see = document.getElementById("seeSheetBot");
-  if (see) see.addEventListener("click", () => { location.hash = "#world"; setFocus(data.name); });
+  const page = host.querySelector("[data-sheet-page]");
+  if (page) page.addEventListener("click", closeArmoryPopup);
+  const see = host.querySelector("[data-sheet-see]");
+  if (see) see.addEventListener("click", () => { closeArmoryPopup(); location.hash = "#world"; setFocus(data.name); });
   for (const img of host.querySelectorAll(".gear-icon img")) {
     img.addEventListener("error", () => {
       // Not in the local client: try the web once (if allowed); not there either (a custom CoA icon): the frame.
@@ -226,7 +234,7 @@ async function renderCharacter(name) {
       img.replaceWith(document.createTextNode(img.dataset.initials));
     });
   }
-  const tip = document.getElementById("itemTip");
+  const tip = host.querySelector(".item-tip");
   const show = node => {
     const piece = bySlot[node.dataset.slot];
     if (!piece) return;
@@ -243,6 +251,31 @@ async function renderCharacter(name) {
     node.addEventListener("mouseleave", () => { tip.hidden = true; });
     node.addEventListener("blur", () => { tip.hidden = true; });
   }
+}
+
+// The Armory sheet in a window over the Bots page, opened by the Armory button of a row: the same sheet as
+// #armory/Name, without leaving the list. Escape, the close button or a click outside closes it.
+function openArmoryPopup(name) {
+  let dialog = document.getElementById("armoryPopup");
+  if (!dialog) {
+    dialog = document.createElement("dialog");
+    dialog.id = "armoryPopup";
+    dialog.className = "armory-popup";
+    dialog.innerHTML = '<button class="btn small armory-popup-close" type="button" aria-label="Close">✕</button>'
+      + '<div class="armory-popup-body"></div>';
+    dialog.querySelector(".armory-popup-close").addEventListener("click", closeArmoryPopup);
+    dialog.addEventListener("click", event => { if (event.target === dialog) closeArmoryPopup(); });
+    document.body.appendChild(dialog);
+  }
+  const body = dialog.querySelector(".armory-popup-body");
+  body.dataset.sheet = name;
+  renderCharacter(name, body);
+  if (!dialog.open) dialog.showModal();
+}
+
+function closeArmoryPopup() {
+  const dialog = document.getElementById("armoryPopup");
+  if (dialog && dialog.open) dialog.close();
 }
 
 // The item's tooltip, laid out like the game's: name in its quality's colour, then what it gives.

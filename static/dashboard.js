@@ -1876,20 +1876,26 @@ function renderRoster() {
     : '<span class="meta">-</span>';
   // Capped so a filter-less list of hundreds stays quick to draw.
   const shown = rows.slice(0, 300);
+  // The Armory button: the private dashboard only (the armory asks the game database, see static/armory.js).
+  const armory = typeof openArmoryPopup === "function";
   host.innerHTML = "<table><thead><tr><th>" + esc(W.sortName) + "</th><th>" + esc(W.colClass) + '</th><th class="r">'
-    + esc(W.sortLevel) + "</th><th>" + esc(W.sortZone) + "</th><th>Doing</th><th>Health</th></tr></thead><tbody>"
+    + esc(W.sortLevel) + "</th><th>" + esc(W.sortZone) + "</th><th>Doing</th><th>Health</th>" + (armory ? "<th></th>" : "") + "</tr></thead><tbody>"
     + shown.map(r => '<tr data-bot="' + esc(r.bot.n) + '"' + (r.bot.n === FOCUS ? ' class="focused"' : "") + ">"
       + "<td>" + factionDot(r.bot.f) + "<b>" + esc(r.bot.n) + "</b></td>"
       + '<td class="meta">' + esc(r.bot.c) + (r.bot.s ? " · " + esc(r.bot.s) : "") + "</td>"
       + '<td class="r">' + esc(r.level) + "</td>"
       + "<td>" + esc(r.zone) + "</td>"
       + '<td class="' + (r.live && r.live.combat ? "fighting" : "meta") + '">' + esc(r.task) + "</td>"
-      + '<td class="hp-cell">' + health(r) + "</td></tr>").join("")
+      + '<td class="hp-cell">' + health(r) + "</td>"
+      + (armory ? '<td class="r"><button class="btn small armory-btn" type="button" data-armory="' + esc(r.bot.n) + '">'
+        + esc(W.pageTitles.armory) + "</button></td>" : "") + "</tr>").join("")
     + "</tbody></table>"
     + (rows.length > shown.length ? '<p class="empty">' + (rows.length - shown.length) + " more: narrow the filter.</p>" : "");
 }
 
 document.getElementById("roster").addEventListener("click", event => {
+  const sheet = event.target.closest("button[data-armory]");
+  if (sheet && typeof openArmoryPopup === "function") { openArmoryPopup(sheet.dataset.armory); return; }
   const row = event.target.closest("tr[data-bot]");
   if (!row) return;
   setFocus(row.dataset.bot);
