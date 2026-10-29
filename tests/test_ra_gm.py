@@ -115,6 +115,17 @@ class RealmsTest(unittest.TestCase):
         with self.assertRaises(ra.RaError):
             ra.command(root, 0, "server info")
 
+    def test_dawnrise_realm(self):
+        root, here = tempfile.mkdtemp(), tempfile.mkdtemp()
+        os.makedirs(os.path.join(root, "Royaumes", "dawnrise", "configs", "modules"))
+        open(os.path.join(root, "Royaumes", "dawnrise", "configs", "worldserver.conf"), "w").close()
+        with open(os.path.join(root, "Royaumes", "dawnrise", "realm.json"), "w") as handle:
+            handle.write('{"id": 4}')
+        coa = realms.Realm("coa", 1, "CoA", {"auth": "a", "characters": "c", "world": "w"}, root, root, [], here, "rndbot", here=here)
+        dawnrise = realms.discover(root, {}, here, coa)[1]
+        self.assertEqual((dawnrise.id, dawnrise.bot_like, dawnrise.db["characters"]), (4, "RNDFP%", "acore_characters_dawnrise"))
+        self.assertEqual((dawnrise.world_port, dawnrise.ra_port), (8385, 3743))      # the launcher's rule: CoA's + 300
+
     def test_own_settings(self):
         root = tempfile.mkdtemp()
         os.makedirs(os.path.join(root, "Royaumes", "reborn"))

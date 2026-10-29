@@ -4,10 +4,10 @@ const PVP_API = "/api/pvp";
 const REALMS_API = "/api/realms";
 
 /* ---------------- realms ---------------- */
-// A server of the launcher runs up to three realms (CoA, Wildcard, Reborn); the page shows one at a time, chosen by
+// A server of the launcher runs up to four realms (CoA, Wildcard, Reborn, Dawnrise); the page shows one at a time, chosen by
 // ?realm=<key> (the launcher opens it so) or the last one picked. Each realm's figures come from its own databases
 // and journals: the local page adds realm=<key> to its questions, the public copy reads stats-<key>.json beside stats.json.
-const REALM_KEYS = ["coa", "wildcard", "reborn"];
+const REALM_KEYS = ["coa", "wildcard", "reborn", "dawnrise"];
 let REALM = new URLSearchParams(location.search).get("realm") || "";
 try { if (!REALM) REALM = localStorage.getItem("squidbots-realm") || ""; } catch (error) { /* private window */ }
 if (!REALM_KEYS.includes(REALM)) REALM = "coa";
@@ -84,7 +84,7 @@ const WORDS = {
     pageTitles: { world: "World", bots: "Bots", stats: "Stats", realms: "Realms", server: "Server health",
       market: "Auction house", gm: "Game master tools",
       chat: "Chat & Loot", pvp: "PvP", settings: "Settings", armory: "Armory" },
-    realmModes: { coa: "Conquest of Azeroth", wildcard: "Wildcard", reborn: "Warcraft Reborn" },
+    realmModes: { coa: "Conquest of Azeroth", wildcard: "Wildcard", reborn: "Warcraft Reborn", dawnrise: "Dawnrise" },
     realmState: { running: "Online", stopped: "Stopped", starting: "Starting", disabled: "Turned off" },
     realmsTitle: "Every realm of this server", realmsSub: "click a realm to open its pages",
     realmsTotal: "All realms", realmOpen: "Open", realmShown: "Shown",
@@ -209,7 +209,7 @@ const WORDS = {
     pageTitles: { world: "Monde", bots: "Bots", stats: "Statistiques", realms: "Royaumes", server: "Santé du serveur",
       market: "Hôtel des ventes", gm: "Outils de maître de jeu",
       chat: "Chat et butin", pvp: "JcJ", settings: "Réglages", armory: "Armurerie" },
-    realmModes: { coa: "Conquest of Azeroth", wildcard: "Wildcard", reborn: "Warcraft Reborn" },
+    realmModes: { coa: "Conquest of Azeroth", wildcard: "Wildcard", reborn: "Warcraft Reborn", dawnrise: "Dawnrise" },
     realmState: { running: "En ligne", stopped: "Arrêté", starting: "Démarrage", disabled: "Désactivé" },
     realmsTitle: "Tous les royaumes du serveur", realmsSub: "cliquez sur un royaume pour ouvrir ses pages",
     realmsTotal: "Tous les royaumes", realmOpen: "Ouvrir", realmShown: "Affiché",

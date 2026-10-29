@@ -16,6 +16,7 @@ MODES = {
     "coa": {"id": 1, "name": "Conquest of Azeroth", "prefix": "rndbot", "step": 0},
     "wildcard": {"id": 2, "name": "Darkmoon (Wildcard)", "prefix": "rndwc", "step": 1},
     "reborn": {"id": 3, "name": "Bronzebeard (Reborn)", "prefix": "rndwr", "step": 2},
+    "dawnrise": {"id": 4, "name": "Dawnrise (Free Pick)", "prefix": "rndfp", "step": 3},
 }
 # Files the dashboard wrote beside itself before it knew of realms: the CoA realm keeps them there.
 LEGACY = {"kills.json", "levels.json", "history.json", "xp-history.json", "baseline.json", "pvp.json"}

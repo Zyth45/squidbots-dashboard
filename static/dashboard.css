@@ -615,6 +615,7 @@ a.char-card.link:hover { border-color: var(--gold); background: rgba(106, 237, 2
 :root, .mode-coa, body[data-shown-realm="coa"] { --realm: #e8b04a; --realm-glow: rgba(232, 176, 74, .28); }
 .mode-wildcard, body[data-shown-realm="wildcard"] { --realm: #c27bff; --realm-glow: rgba(194, 123, 255, .30); }
 .mode-reborn, body[data-shown-realm="reborn"] { --realm: #ff8a3d; --realm-glow: rgba(255, 138, 61, .30); }
+.mode-dawnrise, body[data-shown-realm="dawnrise"] { --realm: #5cc8ff; --realm-glow: rgba(92, 200, 255, .30); }
 .ico[data-icon="realms"]::before { content: "🏰"; }
 .ico[data-icon="server"]::before { content: "📈"; }
 .ico[data-icon="market"]::before { content: "💰"; }

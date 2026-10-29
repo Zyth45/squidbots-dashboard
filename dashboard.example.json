@@ -49,7 +49,7 @@
 
   "_comment_realms": "The Wildcard and Reborn realms of the launcher (Royaumes folder) are found on their own; false shows the CoA realm only. publicRealms limits the realms of the public copy and of the local network page (all of them by default).",
   "realms": true,
-  "publicRealms": ["coa", "wildcard", "reborn"],
+  "publicRealms": ["coa", "wildcard", "reborn", "dawnrise"],
 
   "_comment_monitor": "Server health: one reading every monitorEvery seconds (process figures from Windows and one 'server info' on each realm's console, never the database); 0 turns it off. console false leaves the realms' consoles alone (no tick, no players, no GM tools).",
   "monitorEvery": 60,
