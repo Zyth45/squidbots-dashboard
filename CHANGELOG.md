@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.8.2 (for CoA Bots 2.8.2)
+
+- **Armory from the Bots page**: an Armory button on each bot's row opens its sheet (gear, item tooltips) in a
+  window over the list; "Full page" opens the usual Armory page. Escape, the close button, a click outside or a page
+  change closes it.
+- **Dawnrise (Free Pick)**, the launcher's fourth realm (experimental): found like the others (`Royaumes\dawnrise`,
+  realm id 4, bots `RNDFP…`), with its own colour in the realm picker.
+
 ## 2.8 (for CoA Bots 2.8)
 
 - **Every realm of the server.** Beside the CoA realm, the Wildcard (Darkmoon) and Warcraft Reborn (Bronzebeard)
