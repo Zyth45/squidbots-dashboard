@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.9.2 (for CoA Bots 2.9.2)
+
+- Version aligned with CoA Bots 2.9.2 for the CoA Server Manager; no functional change.
+
 ## 2.8.2 (for CoA Bots 2.8.2)
 
 - **Armory from the Bots page**: an Armory button on each bot's row opens its sheet (gear, item tooltips) in a
