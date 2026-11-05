@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.9.3 (for CoA Bots 2.9.3)
+
+- Version aligned with CoA Bots 2.9.3 for the CoA Server Manager; no functional change.
+
 ## 2.9.2 (for CoA Bots 2.9.2)
 
 - Version aligned with CoA Bots 2.9.2 for the CoA Server Manager; no functional change.
