@@ -50,7 +50,7 @@ const VIVANT_WORDS = {
     stuckEvents: "From the journal (stuck and freed)", liveLog: "Live log", logHelp: "The newest lines of CoaBots.log, read again every 15 s.", logFilter: "Filter",
     noLog: "No CoaBots.log for this realm.", noMatch: "No line matches.",
     soul: { lazy: "Lazy", quester: "Quester", wanderer: "Wanderer", trader: "Trader", pvp: "PvP" },
-    auctions: "Auctions", goldAll: "Gold in circulation", goldBots: "Held by bots", sold24: "Sold, 24 h", crafted24: "Crafted, 24 h", ordersTile: "Orders (last 50)", refusedN: n => n + " refused", goldWait: "first count within 10 min", needs: what => "Nothing yet: needs " + what + " in the module settings.", noAuction: "No auction right now.",
+    auctions: "Auctions", goldAll: "Gold in circulation", goldBots: "Held by bots", sold24: "Sold, 24 h", crafted24: "Crafted, 24 h", ordersTile: "Orders (last 50)", refusedN: n => n + " refused", goldWait: "first count within 10 min", needs: what => "Nothing yet: needs " + what + " in the module settings.", nothing24: "Nothing yet in the last 24 h.", noAuction: "No auction right now.",
     categories: "Prices by category", cat: "Category", avg: "Average", band: "Low · usual · high", volume: "Sold 24 h",
     topSales: "Best sellers, 24 h", crafts: "Crafts, 24 h", orders: "Orders to crafting bots", item: "Item", qty: "Qty", gold: "Gold",
     orderState: { mailed: "mailed", refused: "refused", busy: "busy" },
@@ -110,7 +110,7 @@ const VIVANT_WORDS = {
     stuckEvents: "D’après le journal (coincés et décoincés)", liveLog: "Logs en direct", logHelp: "Les dernières lignes de CoaBots.log, relues toutes les 15 s.", logFilter: "Filtrer",
     noLog: "Pas de CoaBots.log pour ce royaume.", noMatch: "Aucune ligne ne correspond.",
     soul: { lazy: "Paresseux", quester: "Quêteur", wanderer: "Flâneur", trader: "Commerçant", pvp: "JcJ" },
-    auctions: "Enchères", goldAll: "Or en circulation", goldBots: "Détenu par les bots", sold24: "Vendus, 24 h", crafted24: "Fabriqués, 24 h", ordersTile: "Commandes (50 dernières)", refusedN: n => n + " refusée(s)", goldWait: "premier compte sous 10 min", needs: what => "Rien pour l’instant : il faut " + what + " dans les réglages du module.", noAuction: "Aucune enchère pour l’instant.",
+    auctions: "Enchères", goldAll: "Or en circulation", goldBots: "Détenu par les bots", sold24: "Vendus, 24 h", crafted24: "Fabriqués, 24 h", ordersTile: "Commandes (50 dernières)", refusedN: n => n + " refusée(s)", goldWait: "premier compte sous 10 min", needs: what => "Rien pour l’instant : il faut " + what + " dans les réglages du module.", nothing24: "Rien pour l’instant sur les dernières 24 h.", noAuction: "Aucune enchère pour l’instant.",
     categories: "Prix par catégorie", cat: "Catégorie", avg: "Moyen", band: "Bas · usuel · haut", volume: "Vendus 24 h",
     topSales: "Meilleures ventes, 24 h", crafts: "Artisanat, 24 h", orders: "Commandes aux bots artisans", item: "Objet", qty: "Qté", gold: "Or",
     orderState: { mailed: "envoyée", refused: "refusée", busy: "artisan occupé" },
@@ -364,19 +364,21 @@ function vivantEconomy(body, w) {
     pairs([[w.listed, count(a.listed)], [w.bought, count(a.bought)], [w.goldIn, money(a.gold_in)], [w.goldOut, money(a.gold_out)]]);
   const table = (head, rows, why) => rows ? '<div class="scroll"><table><thead><tr>' + head + "</tr></thead><tbody>" + rows + "</tbody></table></div>"
     : '<p class="empty">' + esc(why) + "</p>";
+  // CoA Economy 3.0.1 says which features are on ("features"): "needs …" only for one that is off; a 3.0 file keeps the old text.
+  const f = d.features, why = (key, option) => f && typeof f[key] === "boolean" && f[key] ? w.nothing24 : w.needs(option);
   const share = d.gold_bots !== null && d.gold_bots !== undefined && d.gold_circulating ? Math.round(d.gold_bots / d.gold_circulating * 100) + " %" : "";
   body.innerHTML = topicError(d) + vivantFigures([[w.auctions, count(d.auctions), ""],
     [w.goldAll, money(d.gold_circulating), d.gold_circulating === null ? w.goldWait : ""], [w.goldBots, money(d.gold_bots), share],
-    [w.sold24, count(sold), sold === null ? w.needs("Market.Enable") : ""], [w.crafted24, num(crafted), ""],
+    [w.sold24, count(sold), sold === null ? why("market", "Market.Enable") : ""], [w.crafted24, num(crafted), ""],
     [w.ordersTile, num(orders.length), refused ? w.refusedN(refused) : ""]]) +
     '<section class="card"><h2>' + esc(w.categories) + "</h2>" + table("<th>" + esc(w.cat) + '</th><th class="r">' + esc(w.auctions) + '</th><th class="r">' +
       esc(w.avg) + '</th><th class="r">' + esc(w.band) + '</th><th class="r">' + esc(w.volume) + "</th>", catRows, w.noAuction) + "</section>" +
     '<div class="grid two"><section class="card"><h2>' + esc(w.topSales) + "</h2>" + table("<th>" + esc(w.item) + '</th><th class="r">' + esc(w.qty) +
-      '</th><th class="r">' + esc(w.gold) + "</th>", salesRows, w.needs("Market.Enable")) + "</section>" +
+      '</th><th class="r">' + esc(w.gold) + "</th>", salesRows, why("market", "Market.Enable")) + "</section>" +
     '<section class="card"><h2>' + esc(w.crafts) + "</h2>" + table("<th>" + esc(w.item) + '</th><th class="r">' + esc(w.qty) + '</th><th class="r">' +
-      esc(w.profit) + "</th>", craftRows, w.needs("Artisans")) + "</section></div>" +
+      esc(w.profit) + "</th>", craftRows, why("artisans", "Artisans")) + "</section></div>" +
     '<div class="grid two"><section class="card"><h2>' + esc(w.orders) + "</h2>" + table("<th>" + esc(w.item) + '</th><th class="r">' + esc(w.gold) +
-      "</th><th></th><th></th>", orderRows, w.needs("CraftOrders")) + "</section>" +
+      "</th><th></th><th></th>", orderRows, why("craft_orders", "CraftOrders")) + "</section>" +
     '<section class="card"><h2>' + esc(w.auctionsWeek) + '</h2><div class="chart" id="vvAh"></div></section></div>' +
     '<div class="grid two"><section class="card"><h2>' + esc(w.smelt) + "</h2>" + (d.smelt_24h == null ? '<p class="empty">' + esc(w.soon) + "</p>" :
       table("<th>" + esc(w.item) + '</th><th class="r">' + esc(w.qty) + "</th>", smeltRows, w.needs("Materials"))) + "</section>" +
