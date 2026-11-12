@@ -256,3 +256,8 @@ Ce que montre la page :
 - `feature/vivant-3.0` fusionnée dans `main` en local, `VERSION` 3.0.0, changelog 3.0.0. Ni tag ni push : ils attendent le go de l'user.
 - Dans le paquet, le dépôt va dans `CoA-Bots\Tools\Dashboard`. Seuls les fichiers suivis par git sont livrés (`git archive`). Ce qui est propre au joueur n'est pas dans le dépôt et ne doit jamais être écrasé ni effacé : `dashboard.json`, `data\`, `history.json`, `xp-history.json`, `levels.json`, `kills.json`, `baseline.json`, `pvp.json`, `maps\`, `icons\`, `config-backups\`, `alerte-discord.txt`.
 - Un `dashboard.json` existant (2.9.x) marche tel quel : les nouvelles clés (`squidbotDir`, `vivantDemo`) ont des défauts sûrs.
+
+## 19. Économie : fonctions actives (3.0.1, 13/11)
+
+- CoA Economy 6d432392 ajoute à `economy.json`, dans l'enveloppe à côté de `server_start`, `"features": {"market", "bot_auctions", "artisans", "craft_orders"}` (booléens).
+- Le dashboard (f79704c, puis la lecture de l'enveloppe) n'affiche « il faut … » que pour une fonction à false. Pour une fonction à true dont la liste est vide, il affiche « rien sur les dernières 24 h ». Sans `features` (fichiers 3.0), le texte d'avant reste. `bot_auctions` n'est pas affiché.

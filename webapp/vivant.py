@@ -122,6 +122,8 @@ class Vivant:
             every = float(doc.get("every") or 10)
             answer = dict(doc.get("data") or {}, at=doc.get("at"), every=every, buildUs=doc.get("build_us"),
                           serverStart=doc.get("server_start"), module=doc.get("module"))
+            if isinstance(doc.get("features"), dict) and "features" not in answer:
+                answer["features"] = doc["features"]      # CoA Economy 3.0.1: beside server_start, what is on
         self.cache[topic] = (key, answer)
         return answer
 
