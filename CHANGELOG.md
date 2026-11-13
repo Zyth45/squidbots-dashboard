@@ -1,6 +1,6 @@
 # Changelog
 
-## 3.0.1 (for CoA Bots 3.0.1)
+## 3.1.0 (for CoA Bots 3.1)
 
 - **Economy**: an empty sales, crafts or orders list says "nothing yet in the last 24 h" when CoA Bots says the
   feature is on, and which option turns it on only when it is off (`features` in economy.json). A 3.0 economy.json,

@@ -193,7 +193,7 @@ class MonitorTest(unittest.TestCase):
 
 
 class EconomyFileTest(unittest.TestCase):
-    """economy.json as CoA Economy 3.0 wrote it (no "features") and as 3.0.1 writes it (beside server_start)."""
+    """economy.json as CoA Economy 3.0 wrote it (no "features") and as 3.1 writes it (beside server_start)."""
     def read(self, envelope):
         from webapp import vivant
         here = tempfile.mkdtemp()
@@ -211,7 +211,7 @@ class EconomyFileTest(unittest.TestCase):
         self.assertEqual((answer["auctions"], answer["serverStart"]), (12, 1))
         self.assertNotIn("features", answer)
 
-    def test_3_0_1_file(self):
+    def test_3_1_file(self):
         on = {"market": True, "bot_auctions": False, "artisans": True, "craft_orders": False}
         self.assertEqual(self.read({"features": on})["features"], on)
 

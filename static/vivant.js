@@ -364,7 +364,7 @@ function vivantEconomy(body, w) {
     pairs([[w.listed, count(a.listed)], [w.bought, count(a.bought)], [w.goldIn, money(a.gold_in)], [w.goldOut, money(a.gold_out)]]);
   const table = (head, rows, why) => rows ? '<div class="scroll"><table><thead><tr>' + head + "</tr></thead><tbody>" + rows + "</tbody></table></div>"
     : '<p class="empty">' + esc(why) + "</p>";
-  // CoA Economy 3.0.1 says which features are on ("features"): "needs …" only for one that is off; a 3.0 file keeps the old text.
+  // CoA Economy 3.1 says which features are on ("features"): "needs …" only for one that is off; a 3.0 file keeps the old text.
   const f = d.features, why = (key, option) => f && typeof f[key] === "boolean" && f[key] ? w.nothing24 : w.needs(option);
   const share = d.gold_bots !== null && d.gold_bots !== undefined && d.gold_circulating ? Math.round(d.gold_bots / d.gold_circulating * 100) + " %" : "";
   body.innerHTML = topicError(d) + vivantFigures([[w.auctions, count(d.auctions), ""],
