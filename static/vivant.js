@@ -1,4 +1,4 @@
-/* The living world (CoA Bots 3.0): what the bots do, from the files SquidBot writes (docs: LIAISON-3.0.md).
+/* The living world (CoA Bots 3.0): what the bots do, from the files SquidBot writes.
    Private page, on this PC only. Reads /api/vivant (webapp/vivant.py), which answers with made-up figures,
    marked "demo", for each topic the module does not write yet. Uses server.js (SW, coins, ago, getJson). */
 
@@ -334,7 +334,7 @@ const money = v => (v === null || v === undefined ? "–" : coins(v));
 const count = v => (v === null || v === undefined ? "–" : num(v));
 
 function vivantEconomy(body, w) {
-  // Nulls are real (LIAISON-3.0 §6): gold before the first query, prices without buyouts, bands without Market.Enable.
+  // Nulls are real: gold before the first query, prices without buyouts, bands without Market.Enable.
   const d = VIVANT.economy || {};
   const cats = d.categories || [], orders = d.orders || [], crafts = d.crafts_24h || [], sales = d.top_sales_24h || [];
   const known = cats.filter(c => c.volume_24h !== null && c.volume_24h !== undefined);
@@ -399,7 +399,7 @@ function lastRunsCard(w, runs) {
 }
 
 function vivantGroups(body, w) {
-  // Three writers (LIAISON-3.0 §13): CoA SquidBot's real instance runs (world.json "groups", null before the first run),
+  // Three writers: CoA SquidBot's real instance runs (world.json "groups", null before the first run),
   // CoA World's simulated dungeons and battlegrounds (monde.json, null when off), Dungeon Clear's finished runs (runs.jsonl).
   const d = VIVANT.groups || {};
   const real = d.real, sim = d.sim, bg = d.bg, dc = d.dc || [];

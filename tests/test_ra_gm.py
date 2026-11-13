@@ -192,6 +192,30 @@ class MonitorTest(unittest.TestCase):
             monitor.procinfo.find = original
 
 
+class EconomyFileTest(unittest.TestCase):
+    """economy.json as CoA Economy 3.0 wrote it (no "features") and as 3.0.1 writes it (beside server_start)."""
+    def read(self, envelope):
+        from webapp import vivant
+        here = tempfile.mkdtemp()
+        realm = realms.Realm("coa", 1, "CoA", {"auth": "a", "characters": "c", "world": "w"}, here, here, [], here, "rndbot",
+                             here=here)
+        ctx = type("Ctx", (), {"realm": realm, "file": realm.file, "coa_log": os.path.join(here, "CoaBots.log")})()
+        doc = dict({"schema": "squidbot.economy/1", "at": 1, "every": 10, "build_us": 5, "server_start": 1, "module": None,
+                    "data": {"auctions": 12, "top_sales_24h": [], "crafts_24h": []}}, **envelope)
+        with open(os.path.join(here, "economy.json"), "w", encoding="utf-8") as out:
+            json.dump(doc, out)
+        return vivant.Vivant(ctx, squidbot_dir=here)._read("economy")
+
+    def test_published_3_0_file(self):
+        answer = self.read({})
+        self.assertEqual((answer["auctions"], answer["serverStart"]), (12, 1))
+        self.assertNotIn("features", answer)
+
+    def test_3_0_1_file(self):
+        on = {"market": True, "bot_auctions": False, "artisans": True, "craft_orders": False}
+        self.assertEqual(self.read({"features": on})["features"], on)
+
+
 class PublicCopyTest(unittest.TestCase):
     def test_public_script_names_no_private_url(self):
         """The public copy is refused when a private URL is left outside the private markers (comments included)."""

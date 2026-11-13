@@ -1,4 +1,4 @@
-"""The living world of CoA Bots 3.0: what the bots do, read from the files SquidBot writes (docs: LIAISON-3.0.md).
+"""The living world of CoA Bots 3.0: what the bots do, read from the files SquidBot writes.
 
 SquidBot writes world.json, economy.json, groups.json and monde.json (CoA Monde) in <logs>/squidbot/, each wrapped as
 {schema, at, every, build_us, data}, and only while someone looks: the dashboard rewrites watch.json there
@@ -175,7 +175,7 @@ class Vivant:
             return out
 
     def _groups(self, out, now):
-        """Groups and dungeons, from three writers (LIAISON-3.0 §13): CoA SquidBot's world.json "groups" (real instance runs,
+        """Groups and dungeons, from three writers: CoA SquidBot's world.json "groups" (real instance runs,
         null before the first), CoA World's monde.json "dungeon_sim" and "bg_sim" (null when off), Dungeon Clear's runs.jsonl."""
         world_on = "world" not in out["demo"] + out["missing"] and not out["world"].get("error")
         monde_on = "monde" not in out["demo"] + out["missing"] and not out["monde"].get("error")

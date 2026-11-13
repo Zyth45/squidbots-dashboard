@@ -11,7 +11,7 @@ que poser des valeurs par défaut (chemins, bases dev_*, repères de version) ; 
 
 Ce qui sort (agrégé, AUCUN nom de personnage, de compte ni d'adresse) :
   - periodes : « 24h » (les dernières 24 h) et « depuis » (--depuis ; sans --depuis : tout l'historique), bornées par
-    --plancher (rien n'est compté avant : v8 du 05/10 23:12, correctifs Warsong et Arathi, pour --db nuc|dev) ;
+    --plancher (rien n'est compté avant : v8 du 05/10 23:12, correctifs Warsong et Arathi, valeur par défaut de pvp_machines.json) ;
   - bg[période] : par type (warsong, arathi, alterac, et « tous ») : parties, victoires Alliance / Horde, joueurs par
     partie, objectifs par camp (Warsong : captures, drapeaux rendus ; Arathi : bases attaquées / défendues ; Alterac :
     cimetières, tours, mines), coups fatals par camp, coups fatals par classe (avec le nombre de participations) ;
