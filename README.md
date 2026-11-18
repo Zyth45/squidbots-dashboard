@@ -5,16 +5,21 @@ what they kill, say and find, and whether the server held up while you slept.
 
 ![The World page: a thousand bots on the map, and the one you follow](docs/world.png)
 
-Built for [Conquest of Azeroth](https://github.com/jealous-sound/azerothcore-wotlk-coa) with
-[mod-playerbots](https://github.com/Zyth45/mod-playerbots/tree/coa) (branch `coa`); a plain
+**Current version: 3.1.0**, for **CoA Bots 3.1.x**. It ships inside the CoA Bots package, in
+`CoA-Bots\Tools\Dashboard`, and the SquidBots Server launcher installs and updates it with the rest.
+
+**News, new versions and support: the [SquidBots Discord](https://discord.gg/vBgHuef9k).**
+
+Built for [Conquest of Azeroth](https://github.com/jealous-sound/azerothcore-wotlk-coa) with the
+[SquidBots module](https://github.com/Zyth45/mod-playerbots) (mod-playerbots for Conquest of Azeroth); a plain
 AzerothCore realm works too. It reads the game database and the worldserver's logs, never writes to
 the database, and runs on the Python that ships with the repack: no framework, no build step, no
 package to install, no request to any outside site.
 
 It comes in two versions from the same code: a **private** one on `localhost` with everything,
 including the server's health, its auction house and the game master tools, and a **public** copy of plain
-files you can put on any web server. With the SquidBots launcher it follows every realm of the server: the
-Conquest of Azeroth realm, and the Wildcard and Warcraft Reborn realms beside it.
+files you can put on any web server. With the SquidBots Server launcher it follows every realm of the server: the
+Conquest of Azeroth realm, and the Wildcard, Warcraft Reborn, Dawnrise and Squid World realms beside it.
 
 ## What you get
 
@@ -31,6 +36,21 @@ own map, a bot for its card), and the bot you follow, live: the page at the top 
 | **Server** (private version) | **Auction house** (private version) |
 | ![Server health](docs/server.png) | ![Auction house](docs/market.png) |
 | The realm's tick, players, bots, memory, processor and crashes, over 24 hours and 7 days, with plain advice. | Auctions by house, by seller and by quality, the most expensive, the week's curve, and the auction house bot's commands. |
+
+**Living world** (CoA Bots 3.0 and later) — what the bots do, from the files the module writes while the page is open
+(nothing is written when nobody looks), in six tabs:
+
+- **Population**: everyone online (players, their alts and bots, random bots), where they are (arena, battleground,
+  raid, dungeon, capital, world), by faction and zone, what they do, and the XP catch-up (the players' front, random
+  bots by level, hourly percentiles).
+- **World life**: invasions, rushes, the capital raid, guilds and guild orders, server firsts, stuck bots over 24 h.
+- **Economy**: auction house, crafting, gathering, smelting, disenchanting, prospecting and the auction house bot over
+  24 h. An empty list says whether the feature is on and nothing happened yet, or which option turns it on.
+- **Groups & dungeons**: real bot groups, simulated dungeons and battlegrounds, the last dungeon runs.
+- **Health**: the bots' tick outside the ramp-up, and `CoaBots.log` live with a filter.
+- **Journal**: the world's events.
+
+A file a realm does not write says which option turns it on; no made-up figures.
 
 **Game master** (private version) — a message to every player, and for a player of the list: kick, revive,
 unstuck, mute, level, gold or an item by mail, ban, GM level. Each action is the server's own console command.
@@ -55,17 +75,18 @@ English and French. The SquidBots launcher's own look (deep navy, teal light, th
 icons), so the launcher and the dashboard read as one product. The Cinzel and Inter fonts are bundled under the SIL
 Open Font License (`static/fonts/OFL.txt`).
 
-## Several realms: CoA, Wildcard, Reborn
+## Several realms: CoA, Wildcard, Reborn, Dawnrise, Squid World
 
-A server set up by the CoA launcher can run the Wildcard (Darkmoon) and Warcraft Reborn (Bronzebeard) realms beside
-the CoA one, each in `<repack>\Royaumes\<key>` with its own characters, bots, journals and settings. The dashboard
-finds them on its own and only reads that folder. A realm picker appears in the side bar (each realm in the
+A server set up by the SquidBots Server launcher can run the Wildcard (Darkmoon), Warcraft Reborn (Bronzebeard),
+Dawnrise and Squid World realms beside the CoA one, each in `<repack>\Royaumes\<key>` with its own characters, bots, journals and settings. The dashboard
+finds them on its own, a realm created while it runs included, and only reads that folder. A realm picker appears in the side bar (each realm in the
 launcher's colour); every page then shows the realm picked, and the **Realms** page shows all of them side by side.
-`http://localhost:8088/?realm=wildcard` opens a realm directly. Without a Royaumes folder nothing changes.
+`http://localhost:8088/?realm=wildcard` opens a realm directly. Without a Royaumes folder nothing changes, and
+`"realms": false` in dashboard.json shows the CoA realm only.
 
 The server's settings belong to the launcher (Management tab), which writes every .conf file again at each start: the
 dashboard reads them and changes none. `"settingsPage": true` in dashboard.json brings back the Settings page for a
-server run without the launcher; a Wildcard or Reborn realm's settings then go to `Royaumes\<key>\settings.json`, and
+server run without the launcher; another realm's settings then go to `Royaumes\<key>\settings.json`, and
 what the realm's game mode sets is shown greyed.
 
 ## Server health, auction house, game master (private version only)
@@ -88,7 +109,10 @@ the repack's console account (`Settings\repack.json`), checked before it leaves,
 
 ## Install
 
-Needs Python 3.9 or later and the `mysql` client binary.
+**With CoA Bots** there is nothing to do: the dashboard is in `CoA-Bots\Tools\Dashboard`, already set up for the
+repack, and opens at http://localhost:8088. An update keeps your `dashboard.json`.
+
+**On another AzerothCore server**: it needs Python 3.9 or later and the `mysql` client binary.
 
 1. Copy `squidbots.py`, `botconfig.py`, `index.html`, `worldmap.json`, `static/` and
    `dashboard.example.json` into a folder (`tools/` too if you want the real maps).
@@ -140,7 +164,7 @@ private networks only. `"lanListen": "<this-pc-address>"` limits the port to one
 
 Add these to `worldserver.conf` and restart; until then the cards stay empty and say so.
 
-Spells cast, and rare finds (both need [mod-playerbots on the `coa` branch](https://github.com/Zyth45/mod-playerbots/tree/coa)):
+Spells cast, and rare finds (both need the [SquidBots module](https://github.com/Zyth45/mod-playerbots)):
 
 ```ini
 Appender.CoaBots = 2,4,1,CoaBots.log,a
@@ -172,7 +196,7 @@ it sets the required ones in place, after a backup of `worldserver.conf`.
 
 ## The Settings page
 
-Only for a server run without the SquidBots launcher, with `"settingsPage": true` in `dashboard.json`: the launcher
+Only for a server run without the SquidBots Server launcher, with `"settingsPage": true` in `dashboard.json`: the launcher
 owns the settings of its servers and writes every `.conf` file again at each start. The page changes values in the module `.conf` files (`playerbots.conf`, `dynamicxp.conf`, and
 `mod_bot_minds.conf` when [mod-bot-minds](https://github.com/vedicveko/mod-bot-minds) is
 installed). It edits values in place and never reorders lines; the only line it may add is the bots'
@@ -284,7 +308,8 @@ Settings page with its explanations, override warnings and recipes, and the tool
 maps from your own client with nothing to install. The live bot status on the cards grew out of
 their work too. Thank you!
 
-Pull requests are welcome.
+Pull requests are welcome. Questions and bug reports: the [SquidBots Discord](https://discord.gg/vBgHuef9k) or an
+issue on this repository.
 
 ## Credits
 
