@@ -8,7 +8,7 @@ what they kill, say and find, and whether the server held up while you slept.
 **Current version: 3.1.0**, for **CoA Bots 3.1.x**. It ships inside the CoA Bots package, in
 `CoA-Bots\Tools\Dashboard`, and the SquidBots Server launcher installs and updates it with the rest.
 
-**News, new versions and support: the [SquidBots Discord](https://discord.gg/vBgHuef9k).**
+**News, new versions and support: the [SquidBots Discord](https://discord.gg/DTJceaG9Ky).**
 
 Built for [Conquest of Azeroth](https://github.com/jealous-sound/azerothcore-wotlk-coa) with the
 [SquidBots module](https://github.com/Zyth45/mod-playerbots) (mod-playerbots for Conquest of Azeroth); a plain
@@ -308,7 +308,7 @@ Settings page with its explanations, override warnings and recipes, and the tool
 maps from your own client with nothing to install. The live bot status on the cards grew out of
 their work too. Thank you!
 
-Pull requests are welcome. Questions and bug reports: the [SquidBots Discord](https://discord.gg/vBgHuef9k) or an
+Pull requests are welcome. Questions and bug reports: the [SquidBots Discord](https://discord.gg/DTJceaG9Ky) or an
 issue on this repository.
 
 ## Credits
