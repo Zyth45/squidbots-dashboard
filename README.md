@@ -19,7 +19,7 @@ package to install, no request to any outside site.
 It comes in two versions from the same code: a **private** one on `localhost` with everything,
 including the server's health, its auction house and the game master tools, and a **public** copy of plain
 files you can put on any web server. With the SquidBots Server launcher it follows every realm of the server: the
-Conquest of Azeroth realm, and the Wildcard, Warcraft Reborn, Dawnrise and Squid World realms beside it.
+Conquest of Azeroth realm, and the Wildcard and Warcraft Reborn realms beside it.
 
 ## What you get
 
@@ -75,10 +75,10 @@ English and French. The SquidBots launcher's own look (deep navy, teal light, th
 icons), so the launcher and the dashboard read as one product. The Cinzel and Inter fonts are bundled under the SIL
 Open Font License (`static/fonts/OFL.txt`).
 
-## Several realms: CoA, Wildcard, Reborn, Dawnrise, Squid World
+## Several realms: CoA, Wildcard, Reborn
 
-A server set up by the SquidBots Server launcher can run the Wildcard (Darkmoon), Warcraft Reborn (Bronzebeard),
-Dawnrise and Squid World realms beside the CoA one, each in `<repack>\Royaumes\<key>` with its own characters, bots, journals and settings. The dashboard
+A server set up by the SquidBots Server launcher can run the Wildcard (Darkmoon) and Warcraft Reborn (Bronzebeard)
+realms beside the CoA one, each in `<repack>\Royaumes\<key>` with its own characters, bots, journals and settings. The dashboard
 finds them on its own, a realm created while it runs included, and only reads that folder. A realm picker appears in the side bar (each realm in the
 launcher's colour); every page then shows the realm picked, and the **Realms** page shows all of them side by side.
 `http://localhost:8088/?realm=wildcard` opens a realm directly. Without a Royaumes folder nothing changes, and
